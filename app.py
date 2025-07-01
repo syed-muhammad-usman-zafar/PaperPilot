@@ -478,7 +478,7 @@ def main():
                 st.subheader('📚 References')
                 for ref in st.session_state.reference_list:
                     st.markdown(f"- {ref}")
-            st.caption("Generate one paragraph at a time. You control when to move to the next section.")
+           
 
 if __name__ == "__main__":
     main()
