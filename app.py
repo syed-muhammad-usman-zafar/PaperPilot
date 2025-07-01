@@ -8,7 +8,7 @@ import random
 import requests
 
 class ResearchPromptExtractor:
-    """Extracts research elements from natural language prompts using NLP techniques"""
+    
     
     def __init__(self):
         # Domain classification keywords
@@ -103,9 +103,9 @@ class ResearchPromptExtractor:
         for domain, keywords in self.domain_keywords.items():
             score = 0
             for keyword in keywords:
-                # Count occurrences and weight by keyword specificity
+                
                 occurrences = len(re.findall(r'\b' + re.escape(keyword) + r'\b', prompt_lower))
-                # Longer keywords get higher weight
+                
                 weight = len(keyword.split()) * 1.5 if len(keyword.split()) > 1 else 1
                 score += occurrences * weight
             
@@ -150,7 +150,7 @@ class ResearchPromptExtractor:
         return sorted(found_objectives, key=lambda x: x[1], reverse=True)
     
     def extract_data_types(self, prompt: str) -> List[Tuple[str, int]]:
-        """Extract data types mentioned in the prompt"""
+      
         prompt_lower = prompt.lower()
         found_data_types = []
         
@@ -165,19 +165,19 @@ class ResearchPromptExtractor:
         return sorted(found_data_types, key=lambda x: x[1], reverse=True)
     
     def extract_key_concepts(self, prompt: str) -> List[str]:
-        """Extract key concepts using improved NLP techniques"""
+        
         stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'want', 'study', 'research'}
-        # Extract noun phrases (simple approach)
+        
         words = re.findall(r'\b\w+\b', prompt.lower())
         candidates = []
         for i in range(len(words)):
             if words[i] not in stop_words and len(words[i]) > 3:
-                # Try to get two-word phrases
+               
                 if i < len(words) - 1 and words[i+1] not in stop_words:
                     phrase = f"{words[i]} {words[i+1]}"
                     candidates.append(phrase.title())
                 candidates.append(words[i].title())
-        # Remove duplicates and filter out generic terms
+       
         unique_concepts = []
         seen = set()
         for c in candidates:
@@ -190,7 +190,7 @@ class ResearchPromptExtractor:
         return multi_word[:5] + single_word[:3]
     
     def process_prompt(self, prompt: str) -> Dict:
-        """Process the entire prompt and extract all research elements"""
+       
         domain, domain_confidence = self.extract_domain(prompt)
         methods = self.extract_methods(prompt)
         objectives = self.extract_objectives(prompt)
@@ -211,13 +211,13 @@ class ResearchPromptExtractor:
         }
 
 def get_real_source_summaries(keywords, max_results=2):
-    # Query Semantic Scholar API for real papers
+   
     query = ' '.join(keywords[:4])
     url = f'https://api.semanticscholar.org/graph/v1/paper/search?query={query}&fields=title,authors,year,venue,abstract&limit={max_results}'
     try:
         response = requests.get(url, timeout=10)
         data = response.json()
-        # Debug: Show the query and raw response
+      
         print(f"[DEBUG] Querying Semantic Scholar with: {query}")
         print(f"[DEBUG] API URL: {url}")
         print(f"[DEBUG] API Response: {data}")
@@ -292,7 +292,7 @@ def generate_intro_paragraph(domain, keywords, method, objective, summaries):
             author2 = get_first_author(second['citation'])
             summary2 = truncate_at_sentence(second['summary'], 180)
             para += f"Additionally, {author2} et al. ({year2}) reported that {summary2} "
-        # Remove redundancy in method/objective
+        
         para = re.sub(rf"{method} to {objective}", f"{method} for the purpose of {objective}", para)
         para = re.sub(rf"{objective} using {method}", f"{objective} with the help of {method}", para)
         para += f"Building on these findings, our study will {objective} with the help of {method}, focusing on {', '.join(keywords[:2]) if keywords else 'key concepts'}."
@@ -300,8 +300,7 @@ def generate_intro_paragraph(domain, keywords, method, objective, summaries):
     return "Insufficient source data to generate a contextual paragraph."
 
 def citation_agent(paragraph, summaries):
-    # Insert citations contextually after claims
-    # For simplicity, attach the first citation after the first sentence, the second after the second
+
     sentences = paragraph.split('.')
     cited = []
     for i, sent in enumerate(sentences):
@@ -315,9 +314,9 @@ def citation_agent(paragraph, summaries):
         cited_paragraph += '.'
     return cited_paragraph
 
-# --- Knowledge Graph Data Structure ---
+# Knowledge Graph Data Structure 
 def build_knowledge_graph(domain, keywords, method, objective, summaries, draft_paragraph):
-    # Represent as a dict for now; will visualize later
+    
     graph = {
         'Domain': domain,
         'Keywords': keywords,
@@ -340,7 +339,7 @@ def main():
 
     tabs = st.tabs(["Prompt Extraction", "Drafting (AI Co-Author)"])
 
-    # --- Prompt Extraction Tab ---
+
     with tabs[0]:
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -350,7 +349,7 @@ def main():
             else:
                 default_text = ""
             user_prompt = st.text_area(
-                "✍️ Describe your research idea:",
+                "Describe your research idea:",
                 value=default_text,
                 height=200,
                 placeholder="Example: I want to study the effects of social media on teenage mental health using survey data and statistical analysis to understand behavioral patterns...",
@@ -420,7 +419,7 @@ def main():
 
     # --- Drafting Tab ---
     with tabs[1]:
-        st.header("🤖 Drafting Assistant (AI Co-Author)")
+        st.header("Drafting Assistant (AI Co-Author)")
         if not hasattr(st.session_state, 'results'):
             st.info("Please extract research elements in the first tab before drafting.")
         else:
@@ -433,7 +432,7 @@ def main():
             if 'draft_history' not in st.session_state:
                 st.session_state.draft_history = []
             st.markdown("---")
-            st.subheader("💬 Draft Conversation")
+            st.subheader("Draft Conversation")
             for i, msg in enumerate(st.session_state.draft_history):
                 with st.container():
                     st.markdown(f"<div style='background:#f5f5f5; border-radius:10px; padding:10px; margin-bottom:8px;'><b>{msg['role']}:</b> {msg['content']}</div>", unsafe_allow_html=True)
@@ -471,7 +470,7 @@ def main():
                     st.session_state.reference_list = [s['ref'] for s in summaries]
             if 'knowledge_graph' in st.session_state:
                 st.markdown('---')
-                st.subheader('🧠 Knowledge Graph (Preview)')
+                st.subheader(' Knowledge Graph (Preview)')
                 kg = st.session_state.knowledge_graph
                 st.json(kg)
             if 'reference_list' in st.session_state:
