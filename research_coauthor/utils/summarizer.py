@@ -1,5 +1,5 @@
 import re
-from .citation import get_first_author, get_year_from_citation
+from .citation_agent import get_first_author, get_year_from_citation
 
 def truncate_at_sentence(text, max_len=300):
     """Truncate text at the nearest sentence boundary under max_len."""
