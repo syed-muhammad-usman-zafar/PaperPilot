@@ -8,10 +8,11 @@ import json
 # Add utils to sys.path for imports if running as a script
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
-from utils.llm_extraction import extract_with_llm, draft_paragraph_with_llm
-from utils.semantic_scholar import get_real_source_summaries
+from utils.llm_extraction_agent import extract_with_llm
+from utils.literature_retrieval_agent import get_real_source_summaries
 from utils.summarizer import generate_bullet_summaries
 from utils.knowledge_graph import build_knowledge_graph, show_graph, get_papers_for_keyword, get_authors_for_paper, get_chain_prompt_to_draft
+from utils.writing_agent import writing_agent
 
 # Main Streamlit UI logic
 
@@ -45,7 +46,7 @@ def main():
                 llm_extracted = extract_with_llm(prompt)
                 # Fallbacks for missing fields
                 domain = llm_extracted.get('domain', '')
-                keywords = llm_extracted.get('key concepts', [])
+                keywords = llm_extracted.get('key concepts') or llm_extracted.get('key_concepts', [])
                 # --- Robust extraction for method/objective ---
                 def safe_extract_first(lst, default):
                     if isinstance(lst, list) and lst:
@@ -83,7 +84,30 @@ def main():
                 # Generate content
                 bullet_points = generate_bullet_summaries(summaries)
                 context = f"Domain: {domain}\nMethods: {method}\nObjectives: {objective}\nData Types: {', '.join(data_types)}\nKey Concepts: {', '.join(keywords)}"
-                draft_paragraph = draft_paragraph_with_llm(context, bullet_points)
+                # Build the knowledge graph before drafting
+                G = build_knowledge_graph(domain, keywords, method, objective, summaries, "")
+                # Extract paper nodes (with metadata) from the graph
+                paper_nodes = [n for n, d in G.nodes(data=True) if d.get('type') == 'paper']
+                papers = []
+                for n in paper_nodes:
+                    d = G.nodes[n]
+                    # Find the corresponding summary for this paper node
+                    for s in summaries:
+                        if s.get('title', '') == d.get('title', ''):
+                            papers.append(s)
+                            break
+                # Extract keyword nodes from the graph
+                keyword_nodes = [n for n, d in G.nodes(data=True) if d.get('type') == 'keyword']
+                # Check if all papers are placeholders
+                all_placeholders = all(
+                    p.get('author_names', '') == 'Unknown Author' or 'No relevant papers found' in p.get('title', '')
+                    for p in papers
+                )
+                if all_placeholders:
+                    papers = []
+                    keyword_nodes = []
+                    context += "\nNote: No real literature is available for citation. Write an exploratory paragraph without citing external sources."
+                draft_paragraph = writing_agent(context, papers, keyword_nodes)
                 st.session_state.client_output = draft_paragraph
                 st.session_state.backend = {
                     'prompt': prompt,
