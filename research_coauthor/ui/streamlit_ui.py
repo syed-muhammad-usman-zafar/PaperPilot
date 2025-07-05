@@ -145,18 +145,6 @@ def main():
         if st.session_state.client_warning:
             st.warning(st.session_state.client_warning)
         
-        # Show citation plan info if available
-        if st.session_state.citation_plan:
-            with st.expander("📊 Citation Plan", expanded=False):
-                st.write("**Papers needed per section:**")
-                for section, count in st.session_state.citation_plan.items():
-                    st.write(f"- {section}: {count} papers")
-                st.write(f"**Total papers needed:** {sum(st.session_state.citation_plan.values())}")
-                summaries = st.session_state.backend.get('summaries', []) if st.session_state.backend else []
-                st.write(f"**Papers found:** {len(summaries)}")
-        
-
-        
         # Display full paper output
         if st.session_state.full_paper:
             st.markdown('---')
