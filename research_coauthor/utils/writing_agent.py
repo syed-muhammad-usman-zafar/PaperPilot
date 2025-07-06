@@ -158,9 +158,9 @@ def group_papers_by_theme(papers: List[Dict], keywords: List[str]) -> Dict[str, 
 
 def generate_section_paragraphs(section_name: str, papers: List[Dict], 
                               context: str, n_paragraphs: int = 2,
-                              section_type: str = "general") -> List[str]:
+                              section_type: str = "general", knowledge_graph=None) -> List[str]:
     """
-    Generate multiple paragraphs for a paper section using LLM.
+    Generate multiple paragraphs for a paper section using LLM with neuro-symbolic knowledge graph insights.
     
     Args:
         section_name: Name of the section (e.g., "Introduction")
@@ -168,6 +168,7 @@ def generate_section_paragraphs(section_name: str, papers: List[Dict],
         context: Research context and keywords
         n_paragraphs: Number of paragraphs to generate
         section_type: Type of section for specialized generation
+        knowledge_graph: Knowledge graph for neuro-symbolic insights
     
     Returns:
         List of generated paragraphs
@@ -181,6 +182,29 @@ def generate_section_paragraphs(section_name: str, papers: List[Dict],
         f"[{i+1}] {p['author_names']}, '{p['title']}', {p.get('venue', 'Unknown Venue')}, {p.get('year', 'n.d.')}"
         for i, p in enumerate(papers)
     ])
+    
+    # Extract keywords from context for knowledge graph analysis
+    keywords = []
+    if "Key Concepts:" in context:
+        keywords_str = context.split("Key Concepts:")[1].split("\n")[0]
+        keywords = [k.strip() for k in keywords_str.split(",") if k.strip()]
+    
+    # NEURO-SYMBOLIC: Add knowledge graph insights to system prompt
+    graph_insights = ""
+    if knowledge_graph:
+        try:
+            insights = analyze_knowledge_graph(knowledge_graph)
+            relevant_papers, multi_connected = get_contextual_papers(knowledge_graph, keywords)
+            
+            graph_insights = "\n".join(insights[:3])  # Limit to top 3 insights
+            
+            # Add information about highly connected papers
+            if multi_connected:
+                central_papers = [f"- {p[0]}: connected to {p[1]} keywords" for p in multi_connected[:2]]
+                graph_insights += f"\n\nMost relevant papers (by keyword connections):\n" + "\n".join(central_papers)
+        except Exception as e:
+            print(f"[DEBUG] Error analyzing knowledge graph: {e}")
+            graph_insights = ""
     
     # Specialized prompts for different sections
     if section_type == "literature_review":
@@ -203,6 +227,10 @@ def generate_section_paragraphs(section_name: str, papers: List[Dict],
             f"Use the following papers for citations:\n{paper_list}\n"
             f"Context: {context}"
         )
+    
+    # Add neuro-symbolic insights if available
+    if graph_insights:
+        system_prompt += f"\n\nKnowledge Graph Insights (use these to create more coherent content):\n{graph_insights}"
     
     try:
         response = client.chat.completions.create(
@@ -236,14 +264,15 @@ def generate_section_paragraphs(section_name: str, papers: List[Dict],
         print(f"Error generating {section_name} paragraphs: {e}")
         return [f"Error generating {section_name} content. Please try again."]
 
-def generate_literature_review_section(papers: List[Dict], context: str, keywords: List[str]) -> List[str]:
+def generate_literature_review_section(papers: List[Dict], context: str, keywords: List[str], knowledge_graph=None) -> List[str]:
     """
-    Generate a comprehensive Literature Review section with thematic grouping.
+    Generate a comprehensive Literature Review section with thematic grouping and neuro-symbolic insights.
     
     Args:
         papers: List of papers for literature review
         context: Research context
         keywords: Research keywords
+        knowledge_graph: Knowledge graph for neuro-symbolic insights
     
     Returns:
         List of paragraphs for the Literature Review section
@@ -254,6 +283,22 @@ def generate_literature_review_section(papers: List[Dict], context: str, keyword
     # Group papers by theme
     themed_papers = group_papers_by_theme(papers, keywords)
     
+    # NEURO-SYMBOLIC: Get knowledge graph insights for literature review
+    graph_insights = ""
+    if knowledge_graph:
+        try:
+            insights = analyze_knowledge_graph(knowledge_graph)
+            relevant_papers, multi_connected = get_contextual_papers(knowledge_graph, keywords)
+            
+            graph_insights = "\n".join(insights[:3])
+            
+            if multi_connected:
+                central_papers = [f"- {p[0]}: connected to {p[1]} keywords" for p in multi_connected[:3]]
+                graph_insights += f"\n\nMost relevant papers (by keyword connections):\n" + "\n".join(central_papers)
+        except Exception as e:
+            print(f"[DEBUG] Error analyzing knowledge graph for literature review: {e}")
+            graph_insights = ""
+    
     paragraphs = []
     
     # Generate introduction paragraph
@@ -261,6 +306,9 @@ def generate_literature_review_section(papers: List[Dict], context: str, keyword
         "Write an introductory paragraph for a literature review section that sets up the research context. "
         f"Context: {context}"
     )
+    
+    if graph_insights:
+        intro_prompt += f"\n\nKnowledge Graph Insights:\n{graph_insights}"
     
     try:
         response = client.chat.completions.create(
