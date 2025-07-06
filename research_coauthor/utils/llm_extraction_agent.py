@@ -10,6 +10,10 @@ def extract_with_llm(prompt):
     """Extract research elements from a prompt using OpenAI LLM."""
     system_prompt = (
         "Extract the following as JSON: domain, research methods, objectives, data types, key concepts. "
+        "Additionally, analyze the research context and derive: "
+        "method_type (empirical/theoretical/review/exploratory) and "
+        "objective_scope (exploratory/confirmatory/analytical/comparative). "
+        "For vague prompts, infer these from keywords and context. "
         "Be concise and accurate."
     )
     response = client.chat.completions.create(
@@ -19,7 +23,7 @@ def extract_with_llm(prompt):
             {"role": "user", "content": prompt}
         ],
         temperature=0.2,
-        max_tokens=300
+        max_tokens=400
     )
     content = response.choices[0].message.content
     print(f"[DEBUG] LLM extraction output: {content}")

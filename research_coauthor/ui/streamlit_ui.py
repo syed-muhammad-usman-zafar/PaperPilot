@@ -50,9 +50,9 @@ def main():
         unsafe_allow_html=True
     )
 
-    # Main app background wrapper
+    
     st.markdown("<div class='main-app-bg'>", unsafe_allow_html=True)
-    tabs = st.tabs(["Client View", "Backend View"])
+    tabs = st.tabs(["Client View", "View Thought Process"])
 
     # Initialize session state
     if 'client_prompt' not in st.session_state:
@@ -105,7 +105,9 @@ def main():
                 print(f"[DEBUG] Final keywords for search: {keywords} (type: {type(keywords)})")
                 
                 # Calculate citation plan for full paper
-                citation_plan = calculate_citation_plan(keywords, domain)
+                method_type = llm_extracted.get('method_type', method)
+                objective_scope = llm_extracted.get('objective_scope', objective)
+                citation_plan = calculate_citation_plan(keywords, method_type, objective_scope)
                 total_papers_needed = sum(citation_plan.values())
                 st.session_state.citation_plan = citation_plan
                 
@@ -171,7 +173,7 @@ def main():
                 st.markdown(full_text)
 
     with tabs[1]:
-        st.header("Backend View (Debugging)")
+        st.header("See how PaperPilot works behind the scenes")
         backend = st.session_state.get('backend', None)
         if backend:
             st.subheader("Raw User Prompt")
@@ -220,14 +222,22 @@ def main():
                         st.markdown(f"- {paper['title']}")
             st.subheader("Knowledge Graph Output (JSON)")
             try:
-                G = build_knowledge_graph(
-                    backend.get('final_domain', ''),
-                    backend.get('final_keywords', []),
-                    backend.get('final_method', ''),
-                    backend.get('final_objective', ''),
-                    backend.get('summaries', []),
-                    backend.get('draft_paragraph', '')
-                )
+                # Use the knowledge graph from the full paper result (neuro-symbolic integration)
+                if st.session_state.full_paper and 'knowledge_graph' in st.session_state.full_paper:
+                    G = st.session_state.full_paper['knowledge_graph']
+                    st.success("✅ Using neuro-symbolic knowledge graph from paper generation!")
+                else:
+                    # Fallback to building knowledge graph for display
+                    G = build_knowledge_graph(
+                        backend.get('final_domain', ''),
+                        backend.get('final_keywords', []),
+                        backend.get('final_method', ''),
+                        backend.get('final_objective', ''),
+                        backend.get('summaries', []),
+                        backend.get('draft_paragraph', '')
+                    )
+                    st.info("ℹ️ Using fallback knowledge graph for display only")
+                
                 import networkx as nx
                 st.json(nx.node_link_data(G))
                 st.subheader("Knowledge Graph Visualization")
