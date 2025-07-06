@@ -2,21 +2,18 @@ import re
 from typing import List, Dict
 
 def get_year_from_citation(citation):
-    """Extract the year from a citation string."""
     match = re.search(r", (\d{4})[.,)]", citation)
     if match:
         return match.group(1)
     return "n.d."
 
 def get_first_author(citation):
-    """Extract the first author from a citation string."""
     match = re.match(r"\[\d+\] ([^,]+)", citation)
     if match:
         return match.group(1)
     return "Unknown"
 
 def citation_agent(paragraph, summaries):
-    """Inject citations into a paragraph based on summaries."""
     sentences = paragraph.split('.')
     cited = []
     for i, sent in enumerate(sentences):
@@ -30,28 +27,29 @@ def citation_agent(paragraph, summaries):
         cited_paragraph += '.'
     return cited_paragraph
 
-def calculate_citation_plan(keywords: List[str], domain: str) -> Dict[str, int]:
+def calculate_citation_plan(keywords: List[str], method: str, objective: str) -> Dict[str, int]:
     """
-    Dynamically calculate citation plan based on research complexity.
+    Use LLM-derived insights to dynamically calculate citation needs.
     
     Args:
         keywords: List of extracted keywords
-        domain: Research domain (e.g., 'Computer Science', 'Biology')
+        method: LLM-derived method type (empirical/theoretical/review/exploratory)
+        objective: LLM-derived objective scope (exploratory/confirmatory/analytical/comparative)
     
     Returns:
         Dictionary mapping section names to number of citations needed
     """
-    # Base plan
+    # Base citation plan
     base_plan = {
         "Abstract": 1,
-        "Introduction": 2,
-        "Literature Review": 5,
-        "Methodology": 2,
+        "Introduction": 3,
+        "Literature Review": 6,
+        "Methodology": 3,
         "Experiments / Results": 2,
         "Conclusion": 1
     }
     
-    # Adjust based on number of keywords
+    # Adjust based on number of keywords (complexity)
     keyword_count = len(keywords)
     if keyword_count > 8:
         # Complex research - increase citations
@@ -61,16 +59,37 @@ def calculate_citation_plan(keywords: List[str], domain: str) -> Dict[str, int]:
         # Simple research - decrease citations
         base_plan["Literature Review"] = max(3, base_plan["Literature Review"] - 1)
     
-    # Adjust based on domain
-    domain_lower = domain.lower()
-    if any(term in domain_lower for term in ['computer science', 'cs', 'artificial intelligence', 'ai', 'machine learning']):
-        # CS/AI domains typically need more citations
+    # Use LLM-derived method type
+    method_lower = method.lower()
+    if 'empirical' in method_lower or 'experiment' in method_lower or 'study' in method_lower:
+        # Empirical work - needs more methodology citations
+        base_plan["Methodology"] = min(4, base_plan["Methodology"] + 1)
+        base_plan["Experiments / Results"] = min(3, base_plan["Experiments / Results"] + 1)
+    elif 'review' in method_lower or 'survey' in method_lower or 'synthesis' in method_lower:
+        # Review work - needs extensive literature review
+        base_plan["Literature Review"] = min(9, base_plan["Literature Review"] + 2)
+    elif 'theoretical' in method_lower or 'model' in method_lower or 'framework' in method_lower:
+        # Theoretical work - needs more literature review
+        base_plan["Literature Review"] = min(8, base_plan["Literature Review"] + 1)
+    elif 'exploratory' in method_lower:
+        # Exploratory work - needs broader literature review
+        base_plan["Literature Review"] = min(8, base_plan["Literature Review"] + 1)
+    
+    # Use LLM-derived objective scope
+    objective_lower = objective.lower()
+    if 'exploratory' in objective_lower or 'explore' in objective_lower:
+        # Exploratory research - needs broader literature review
+        base_plan["Literature Review"] = min(8, base_plan["Literature Review"] + 1)
+    elif 'confirmatory' in objective_lower or 'confirm' in objective_lower or 'test' in objective_lower:
+        # Confirmatory research - needs more methodology citations
+        base_plan["Methodology"] = min(4, base_plan["Methodology"] + 1)
+    elif 'analytical' in objective_lower or 'analyze' in objective_lower:
+        # Analytical research - balanced approach
         base_plan["Literature Review"] = min(8, base_plan["Literature Review"] + 1)
         base_plan["Methodology"] = min(4, base_plan["Methodology"] + 1)
-    elif any(term in domain_lower for term in ['biology', 'biomedical', 'medical', 'health']):
-        # Biology/medical domains need extensive literature review
-        base_plan["Literature Review"] = min(10, base_plan["Literature Review"] + 2)
-        base_plan["Introduction"] = min(4, base_plan["Introduction"] + 1)
+    elif 'comparative' in objective_lower or 'compare' in objective_lower:
+        # Comparative research - needs extensive literature review
+        base_plan["Literature Review"] = min(9, base_plan["Literature Review"] + 2)
     
     return base_plan
 
