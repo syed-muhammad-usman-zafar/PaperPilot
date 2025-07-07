@@ -28,17 +28,7 @@ def citation_agent(paragraph, summaries):
     return cited_paragraph
 
 def calculate_citation_plan(keywords: List[str], method: str, objective: str) -> Dict[str, int]:
-    """
-    Use LLM-derived insights to dynamically calculate citation needs.
-    
-    Args:
-        keywords: List of extracted keywords
-        method: LLM-derived method type (empirical/theoretical/review/exploratory)
-        objective: LLM-derived objective scope (exploratory/confirmatory/analytical/comparative)
-    
-    Returns:
-        Dictionary mapping section names to number of citations needed
-    """
+  
     # Base citation plan
     base_plan = {
         "Abstract": 1,
