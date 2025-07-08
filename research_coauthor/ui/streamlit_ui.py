@@ -11,7 +11,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
 from utils.llm_extraction_agent import extract_with_llm
 from utils.research_agent import get_real_source_summaries
-from utils.summarizer import generate_bullet_summaries
 from utils.knowledge_graph import build_knowledge_graph, show_graph, get_papers_for_keyword, get_authors_for_paper, get_chain_prompt_to_draft
 from utils.writing_agent import writing_agent
 from utils.citation_agent import citation_agent
