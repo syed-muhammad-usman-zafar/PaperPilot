@@ -158,9 +158,28 @@ def main():
             for section_name, paragraphs in st.session_state.full_paper['sections'].items():
                 with st.expander(f"📄 {section_name}", expanded=(section_name in ["Abstract", "Introduction"])):
                     for i, paragraph in enumerate(paragraphs):
-                        st.markdown(paragraph)
+                        # Post-process paragraph to replace "Paper_1", "Paper_2", etc. with correct citations
+                        processed_paragraph = paragraph
+                        if 'citation_map' in st.session_state.full_paper:
+                            citation_map = st.session_state.full_paper['citation_map']
+                            for paper in st.session_state.full_paper['section_assignments'].get(section_name, []):
+                                key = (paper['title'], paper['author_names'])
+                                citation_num = citation_map.get(key)
+                                if citation_num:
+                                    # Replace "Paper_1", "Paper_2", etc. with [n]
+                                    import re
+                                    processed_paragraph = re.sub(rf"Paper_{citation_num}", f"[{citation_num}]", processed_paragraph)
+                                    processed_paragraph = re.sub(rf"Paper {citation_num}", f"[{citation_num}]", processed_paragraph)
+                        st.markdown(processed_paragraph)
                         if i < len(paragraphs) - 1:  # Add spacing between paragraphs
                             st.markdown("")
+            
+            # Display References section
+            if 'references' in st.session_state.full_paper:
+                with st.expander("📄 References", expanded=False):
+                    # Render each reference on its own line
+                    refs_md = st.session_state.full_paper['references'].replace('\n', '\n\n')
+                    st.markdown(refs_md)
             
             # Full paper view
             with st.expander("📋 Complete Paper View", expanded=False):
@@ -168,7 +187,25 @@ def main():
                 for section_name, paragraphs in st.session_state.full_paper['sections'].items():
                     full_text += f"## {section_name}\n\n"
                     for paragraph in paragraphs:
-                        full_text += f"{paragraph}\n\n"
+                   
+                        processed_paragraph = paragraph
+                        if 'citation_map' in st.session_state.full_paper:
+                            citation_map = st.session_state.full_paper['citation_map']
+                            for paper in st.session_state.full_paper['section_assignments'].get(section_name, []):
+                                key = (paper['title'], paper['author_names'])
+                                citation_num = citation_map.get(key)
+                                if citation_num:
+                                    # Replace "Paper_1", "Paper_2", etc. with [n]
+                                    import re
+                                    processed_paragraph = re.sub(rf"Paper_{citation_num}", f"[{citation_num}]", processed_paragraph)
+                                    processed_paragraph = re.sub(rf"Paper {citation_num}", f"[{citation_num}]", processed_paragraph)
+                        full_text += f"{processed_paragraph}\n\n"
+                
+                # Add References section to complete paper view
+                if 'references' in st.session_state.full_paper:
+                    refs_md = st.session_state.full_paper['references'].replace('\n', '\n\n')
+                    full_text += f"## References\n\n{refs_md}\n\n"
+                
                 st.markdown(full_text)
 
     with tabs[1]:

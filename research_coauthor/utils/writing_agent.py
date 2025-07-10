@@ -158,7 +158,7 @@ def group_papers_by_theme(papers: List[Dict], keywords: List[str]) -> Dict[str, 
 
 def generate_section_paragraphs(section_name: str, papers: List[Dict], 
                               context: str, n_paragraphs: int = 2,
-                              section_type: str = "general", knowledge_graph=None) -> List[str]:
+                              section_type: str = "general", knowledge_graph=None, citation_map=None) -> List[str]:
     """
     Generate multiple paragraphs for a paper section using LLM with neuro-symbolic knowledge graph insights.
     
@@ -169,6 +169,7 @@ def generate_section_paragraphs(section_name: str, papers: List[Dict],
         n_paragraphs: Number of paragraphs to generate
         section_type: Type of section for specialized generation
         knowledge_graph: Knowledge graph for neuro-symbolic insights
+        citation_map: Mapping from (title, author_names) to citation number
     
     Returns:
         List of generated paragraphs
@@ -179,8 +180,10 @@ def generate_section_paragraphs(section_name: str, papers: List[Dict],
     
     # Build paper list for citation
     paper_list = "\n".join([
-        f"[{i+1}] {p['author_names']}, '{p['title']}', {p.get('venue', 'Unknown Venue')}, {p.get('year', 'n.d.')}"
-        for i, p in enumerate(papers)
+        f"[{citation_map[(p['title'], p['author_names'])]}] {p['author_names']}, '{p['title']}', {p.get('venue', 'Unknown Venue')}, {p.get('year', 'n.d.')}"
+        for p in papers
+    ]) if citation_map else "\n".join([
+        f"{p['author_names']}, '{p['title']}', {p.get('venue', 'Unknown Venue')}, {p.get('year', 'n.d.')}" for p in papers
     ])
     
     # Extract keywords from context for knowledge graph analysis
@@ -212,19 +215,21 @@ def generate_section_paragraphs(section_name: str, papers: List[Dict],
             f"You are an expert academic writer. Write {n_paragraphs} well-structured paragraphs for the {section_name} section. "
             f"Focus on synthesizing and comparing the following papers:\n{paper_list}\n"
             f"Use academic transitions like 'Similarly,' 'In contrast,' 'Building on this work,' 'Furthermore,' etc. "
-            f"Each paragraph should flow naturally to the next. Cite papers using (Author, Year) format. "
+            f"Each paragraph should flow naturally to the next. Cite papers using [n] style, where n matches the number in the paper list. "
             f"Context: {context}"
         )
     elif section_type == "methodology":
         system_prompt = (
             f"You are an expert academic writer. Write {n_paragraphs} paragraphs for the {section_name} section. "
             f"Focus on research methods and approaches, citing relevant methodological papers:\n{paper_list}\n"
+            f"Cite papers using [n] style, where n matches the number in the paper list. "
             f"Context: {context}"
         )
     else:
         system_prompt = (
             f"You are an expert academic writer. Write {n_paragraphs} paragraphs for the {section_name} section. "
             f"Use the following papers for citations:\n{paper_list}\n"
+            f"Cite papers using [n] style, where n matches the number in the paper list. "
             f"Context: {context}"
         )
     
@@ -258,13 +263,32 @@ def generate_section_paragraphs(section_name: str, papers: List[Dict],
             # Truncate to requested number
             paragraphs = paragraphs[:n_paragraphs]
         
+        # Replace any [n] citations with correct numbers using citation_map
+        if citation_map:
+            for i, para in enumerate(paragraphs):
+                for p in papers:
+                    key = (p['title'], p['author_names'])
+                    n = citation_map.get(key)
+                    if n:
+                        # Replace all occurrences of the paper's author/year style with [n]
+                        # (Assume LLM uses (Author, Year) or similar, so we replace those with [n])
+                        author = p['author_names'].split(',')[0].split()[0] if p['author_names'] else ''
+                        year = str(p.get('year', 'n.d.'))
+                        # Replace (Author, Year) and similar
+                        import re
+                        para = re.sub(rf"\\({author}.*?{year}\\)", f"[{n}]", para)
+                        # Also replace any [i] with [n] if LLM outputs [i]
+                        para = re.sub(rf"\[{i+1}\]", f"[{n}]", para)
+                paragraphs[i] = para
+        
         return paragraphs
         
     except Exception as e:
         print(f"Error generating {section_name} paragraphs: {e}")
         return [f"Error generating {section_name} content. Please try again."]
 
-def generate_literature_review_section(papers: List[Dict], context: str, keywords: List[str], knowledge_graph=None) -> List[str]:
+
+def generate_literature_review_section(papers: List[Dict], context: str, keywords: List[str], knowledge_graph=None, citation_map=None) -> List[str]:
     """
     Generate a comprehensive Literature Review section with thematic grouping and neuro-symbolic insights.
     
@@ -273,6 +297,7 @@ def generate_literature_review_section(papers: List[Dict], context: str, keyword
         context: Research context
         keywords: Research keywords
         knowledge_graph: Knowledge graph for neuro-symbolic insights
+        citation_map: Mapping from (title, author_names) to citation number
     
     Returns:
         List of paragraphs for the Literature Review section
@@ -334,14 +359,16 @@ def generate_literature_review_section(papers: List[Dict], context: str, keyword
             continue
             
         paper_list = "\n".join([
-            f"[{i+1}] {p['author_names']}, '{p['title']}', {p.get('venue', 'Unknown Venue')}, {p.get('year', 'n.d.')}"
-            for i, p in enumerate(theme_papers)
+            f"[{citation_map[(p['title'], p['author_names'])]}] {p['author_names']}, '{p['title']}', {p.get('venue', 'Unknown Venue')}, {p.get('year', 'n.d.')}"
+            for p in theme_papers
+        ]) if citation_map else "\n".join([
+            f"{p['author_names']}, '{p['title']}', {p.get('venue', 'Unknown Venue')}, {p.get('year', 'n.d.')}" for p in theme_papers
         ])
         
         theme_prompt = (
             f"Write a paragraph discussing research related to '{theme}'. "
             f"Use these papers: {paper_list}\n"
-            f"Use academic transitions and cite papers using (Author, Year) format. "
+            f"Use academic transitions and cite papers using [n] style, where n matches the number in the paper list. "
             f"Context: {context}"
         )
         
@@ -357,7 +384,19 @@ def generate_literature_review_section(papers: List[Dict], context: str, keyword
             )
             content = response.choices[0].message.content
             if content:
-                paragraphs.append(content.strip())
+                para = content.strip()
+                # Replace any [n] citations with correct numbers using citation_map
+                if citation_map:
+                    for p in theme_papers:
+                        key = (p['title'], p['author_names'])
+                        n = citation_map.get(key)
+                        if n:
+                            author = p['author_names'].split(',')[0].split()[0] if p['author_names'] else ''
+                            year = str(p.get('year', 'n.d.'))
+                            import re
+                            para = re.sub(rf"\\({author}.*?{year}\\)", f"[{n}]", para)
+                            para = re.sub(rf"\[{theme_papers.index(p)+1}\]", f"[{n}]", para)
+                paragraphs.append(para)
             else:
                 paragraphs.append(f"Research in {theme} has been explored by various authors in the field.")
         except:

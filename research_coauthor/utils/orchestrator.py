@@ -39,6 +39,15 @@ def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any],
     # Assign papers to sections using citation_agent
     section_assignments = assign_papers_to_sections(summaries, citation_plan)
     
+    # Build citation mapping: paper id (by title+author) -> citation number
+    citation_map = {}
+    paper_key_to_index = {}
+    for idx, paper in enumerate(summaries):
+        # Use (title, author_names) as a unique key
+        key = (paper.get('title', ''), paper.get('author_names', ''))
+        citation_map[key] = idx + 1
+        paper_key_to_index[key] = idx
+    
     # Build context string
     context = f"Domain: {domain}\nMethods: {method}\nObjectives: {objective}\nKey Concepts: {', '.join(keywords)}"
     
@@ -54,33 +63,53 @@ def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any],
     
     # Abstract
     paper_sections["Abstract"] = generate_section_paragraphs(
-        "Abstract", section_assignments["Abstract"], context, 1, "abstract", knowledge_graph
+        "Abstract", section_assignments["Abstract"], context, 1, "abstract", knowledge_graph, citation_map
     )
     
     # Introduction
     paper_sections["Introduction"] = generate_section_paragraphs(
-        "Introduction", section_assignments["Introduction"], context, 2, "introduction", knowledge_graph
+        "Introduction", section_assignments["Introduction"], context, 2, "introduction", knowledge_graph, citation_map
     )
     
     # Literature Review
     paper_sections["Literature Review"] = generate_literature_review_section(
-        section_assignments["Literature Review"], context, keywords, knowledge_graph
+        section_assignments["Literature Review"], context, keywords, knowledge_graph, citation_map
     )
     
     # Methodology
     paper_sections["Methodology"] = generate_section_paragraphs(
-        "Methodology", section_assignments["Methodology"], context, 2, "methodology", knowledge_graph
+        "Methodology", section_assignments["Methodology"], context, 2, "methodology", knowledge_graph, citation_map
     )
     
     # Experiments / Results
     paper_sections["Experiments / Results"] = generate_section_paragraphs(
-        "Experiments / Results", section_assignments["Experiments / Results"], context, 2, "results", knowledge_graph
+        "Experiments / Results", section_assignments["Experiments / Results"], context, 2, "results", knowledge_graph, citation_map
     )
     
     # Conclusion
     paper_sections["Conclusion"] = generate_section_paragraphs(
-        "Conclusion", section_assignments["Conclusion"], context, 1, "conclusion", knowledge_graph
+        "Conclusion", section_assignments["Conclusion"], context, 1, "conclusion", knowledge_graph, citation_map
     )
+    
+    # Build References section
+    references = []
+    for idx, paper in enumerate(summaries):
+        # Only include venue if it's not "Unknown Venue"
+        venue = paper.get('venue', '')
+        print(f"[DEBUG] Paper {idx+1} venue: '{venue}' (type: {type(venue)})")
+        # More robust venue filtering
+        venue_clean = venue.strip() if venue else ""
+        is_unknown_venue = (venue_clean.lower() in ['unknown venue', 'unknown', 'n/a', ''] or 
+                           'unknown' in venue_clean.lower() and 'venue' in venue_clean.lower())
+        venue_part = f", {venue_clean}" if venue_clean and not is_unknown_venue else ""
+        print(f"[DEBUG] Paper {idx+1} venue_part: '{venue_part}'")
+        # Handle year formatting
+        year = paper.get('year', 'n.d.')
+        year_part = f", {year}" if year and year != 'n.d.' else ""
+        ref = f"[{idx+1}] {paper['author_names']}, \"{paper['title']}\"{venue_part}{year_part}"
+        print(f"[DEBUG] Reference {idx+1}: {paper['author_names']} | {paper['title']} | {venue}")
+        references.append(ref)
+    references_section = "References\n" + "\n".join(references)
     
     return {
         "title": f"Research on {', '.join(keywords[:3])}",
@@ -90,5 +119,7 @@ def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any],
         "total_papers_needed": total_papers_needed,
         "papers_found": len(summaries),
         "context": context,
-        "knowledge_graph": knowledge_graph  # Include knowledge graph in return for UI display
+        "knowledge_graph": knowledge_graph,  # Include knowledge graph in return for UI display
+        "references": references_section,
+        "citation_map": citation_map
     } 
