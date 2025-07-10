@@ -84,16 +84,7 @@ def calculate_citation_plan(keywords: List[str], method: str, objective: str) ->
     return base_plan
 
 def assign_papers_to_sections(summaries: List[Dict], plan: Dict[str, int]) -> Dict[str, List[Dict]]:
-    """
-    Evenly assign retrieved summaries to paper sections based on the citation plan.
-    
-    Args:
-        summaries: List of paper summaries from literature retrieval
-        plan: Citation plan dictionary
-    
-    Returns:
-        Dictionary mapping section names to assigned paper summaries
-    """
+
     total_needed = sum(plan.values())
     available_papers = len(summaries)
     

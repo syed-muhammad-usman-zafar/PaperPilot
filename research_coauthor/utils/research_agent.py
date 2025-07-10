@@ -21,7 +21,9 @@ def get_crossref_summaries(keywords, max_results=2):
         for i, item in enumerate(items):
             title = item.get('title', ['No Title'])[0]
             authors = item.get('author', [])
+            print(f"[DEBUG] CrossRef Paper {i+1} raw authors: {authors}")
             author_names = ', '.join([f"{a.get('given', '')} {a.get('family', '')}".strip() for a in authors[:3]]) or "Unknown Author"
+            print(f"[DEBUG] CrossRef Paper {i+1} extracted author_names: '{author_names}'")
             year = item.get('issued', {}).get('date-parts', [["n.d."]])[0][0]
             venue = item.get('container-title', ['Unknown Venue'])[0]
             abstract = item.get('abstract', '')
@@ -126,7 +128,13 @@ def get_real_source_summaries(keywords, max_results=2):
             filter_terms = [k.lower() for k in cleaned_keywords if isinstance(k, str)]
             filtered_papers = []
             for paper in papers:
-                text = (paper.get('title', '') + ' ' + paper.get('abstract', '')).lower()
+                # Fix the concatenation error by handling None values properly
+                title = paper.get('title') or ''
+                abstract = paper.get('abstract') or ''
+                # Ensure both are strings before concatenation
+                title = str(title) if title is not None else ''
+                abstract = str(abstract) if abstract is not None else ''
+                text = (title + ' ' + abstract).lower()
                 if any(term in text for term in filter_terms):
                     filtered_papers.append(paper)
             if not filtered_papers:
@@ -137,8 +145,41 @@ def get_real_source_summaries(keywords, max_results=2):
         for i, paper in enumerate(papers):
             title = paper.get('title', 'No Title')
             authors = paper.get('authors', [])
-            author_names = ', '.join([a.get('name', '') for a in authors[:3]]) or "Unknown Author"
-            year = paper.get('year', 'n.d.')
+            print(f"[DEBUG] Paper {i+1} raw authors data: {authors} (type: {type(authors)})")
+            print(f"[DEBUG] Paper {i+1} full paper data keys: {list(paper.keys())}")
+            # Better author extraction
+            author_list = []
+            for a in authors[:3]:
+                name = a.get('name', '').strip()
+                if name:  # Only add non-empty names
+                    author_list.append(name)
+            # If no authors found, try alternative fields
+            if not author_list:
+                print(f"[DEBUG] Paper {i+1} no authors in 'authors' field, trying alternatives...")
+                # Try different possible author fields
+                for field in ['author', 'creator', 'contributor']:
+                    alt_authors = paper.get(field, [])
+                    if alt_authors:
+                        print(f"[DEBUG] Paper {i+1} found authors in '{field}': {alt_authors}")
+                        for a in alt_authors[:3]:
+                            if isinstance(a, dict):
+                                name = a.get('name', '').strip()
+                            else:
+                                name = str(a).strip()
+                            if name:
+                                author_list.append(name)
+                        if author_list:
+                            break
+            author_names = ', '.join(author_list) if author_list else "Unknown Author"
+            print(f"[DEBUG] Paper {i+1} extracted author_names: '{author_names}'")
+            # Better year extraction with debugging
+            raw_year = paper.get('year')
+            print(f"[DEBUG] Paper {i+1} raw year data: {raw_year} (type: {type(raw_year)})")
+            if raw_year is not None and raw_year != '':
+                year = str(raw_year)
+            else:
+                year = 'n.d.'
+            print(f"[DEBUG] Paper {i+1} final year: '{year}'")
             venue = paper.get('venue', 'Unknown Venue')
             abstract = paper.get('abstract', '')
             citation = f"[{i+1}] {author_names}, '{title}', {venue}, {year}"
