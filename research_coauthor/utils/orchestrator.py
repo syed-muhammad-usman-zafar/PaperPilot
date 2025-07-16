@@ -71,4 +71,4 @@ def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any],
             "papers_found": 0,
             "total_papers_needed": 0,
             "section_assignments": {},
-        } 
+        }

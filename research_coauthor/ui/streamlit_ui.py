@@ -1,5 +1,7 @@
 import streamlit as st
 import base64
+import dotenv
+from concurrent.futures import ThreadPoolExecutor
 
 # Add utils to sys.path for imports if running as a script
 # sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils')) # This line is removed as per the new_code
@@ -10,6 +12,10 @@ from utils.knowledge_graph import build_knowledge_graph, show_graph, get_papers_
 from utils.citation_agent import citation_agent
 from utils.orchestrator import generate_full_paper
 from utils.citation_agent import calculate_citation_plan
+from utils.validate_prompt import ValidatePrompt
+
+dotenv.load_dotenv()
+
 
 # PDF extraction helper
 try:
@@ -152,7 +158,19 @@ def main():
             with st.spinner("Processing your request. Please wait..."):
                 st.session_state.client_prompt = prompt
                 # LLM extraction
-                llm_extracted = extract_with_llm(prompt)
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    llm_extracted_future = executor.submit(extract_with_llm, prompt)
+                    validation_future = executor.submit(ValidatePrompt, prompt)
+
+                    llm_extracted = llm_extracted_future.result()
+                    validation = validation_future.result()
+
+                write_request = validation.get("write_request", False)
+
+                if not write_request:
+                    st.warning("The Prompt You Submitted does not Ask us to generate a Research Paper. Please try again with a different prompt.")
+                    return
+                
                 # Fallbacks for missing fields
                 domain = llm_extracted.get('domain', '')
                 keywords = llm_extracted.get('key concepts') or llm_extracted.get('key_concepts', [])

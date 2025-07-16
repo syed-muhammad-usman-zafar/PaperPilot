@@ -8,21 +8,23 @@ def build_knowledge_graph(domain, keywords, method, objective, summaries, draft_
     G = nx.DiGraph()
     # Add main nodes only if non-empty
     G.add_node('Prompt', type='prompt')
-    if domain and len(domain.strip()) > 2:
-        G.add_node(domain, type='domain')
-        G.add_edge('Prompt', domain, relation='has_domain')
-    if method and len(method.strip()) > 2:
-        G.add_node(method, type='method')
-        G.add_edge('Prompt', method, relation='has_method')
-    if objective and len(objective.strip()) > 2:
-        G.add_node(objective, type='objective')
-        G.add_edge('Prompt', objective, relation='has_objective')
+    if domain:
+        for d in domain:
+            G.add_node(d, type='domain')
+            G.add_edge('Prompt', d, relation='has_domain')
+    if method:
+        for m in method:
+            G.add_node(m, type='method')
+            G.add_edge('Prompt', m, relation='has_method')
+    if objective:
+        for o in objective:
+            G.add_node(o, type='objective')
+            G.add_edge('Prompt', o, relation='has_objective')
     G.add_node('DraftParagraph', type='draft')
     G.add_edge('Prompt', 'DraftParagraph', relation='generates')
-    # Limit keywords to top 5 for clarity
-    if keywords and isinstance(keywords, list):
-        for kw in keywords[:5]:
-            if isinstance(kw, str) and len(kw.strip()) > 2:
+
+    if keywords:
+        for kw in keywords:
                 G.add_node(kw, type='keyword')
                 G.add_edge('Prompt', kw, relation='has_keyword')
     # Add papers and authors, treat user research as unique node

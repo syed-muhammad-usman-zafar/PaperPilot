@@ -1,11 +1,12 @@
 import os
 import json
 from dotenv import load_dotenv
-import google.generativeai as genai
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 load_dotenv()
-genai.configure(api_key=os.getenv("OPENAI_API_KEY"))
-model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, google_api_key=GOOGLE_API_KEY, disable_streaming=True)
 
 
 def analyze_knowledge_graph(G):
@@ -42,8 +43,8 @@ def generate_full_paper_with_llm(context, papers, knowledge_graph_summary, user_
         "Do not invent citations, datasets, or references. Ensure every section is present and clearly separated."
     )
     try:
-        response = model.generate_content(prompt, generation_config={"max_output_tokens": 1024})
-        raw_output = response.text
+        response = model.invoke(prompt)
+        raw_output = response.content if hasattr(response, "content") else response
         # Parse sections by section titles (plain text, not markdown)
         import re
         section_titles = [
