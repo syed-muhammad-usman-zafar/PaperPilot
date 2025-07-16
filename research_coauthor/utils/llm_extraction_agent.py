@@ -1,38 +1,47 @@
-import openai
 import os
-from dotenv import load_dotenv
 import json
+import re
+from dotenv import load_dotenv
+import google.generativeai as genai
 
 load_dotenv()
-client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+genai.configure(api_key=os.getenv("OPENAI_API_KEY"))
+model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
 
 def extract_with_llm(prompt):
-    """Extract research elements from a prompt using OpenAI LLM."""
     system_prompt = (
         "Extract the following as JSON: domain, research methods, objectives, data types, key concepts. "
-        "Additionally, analyze the research context and derive: "
-        "method_type (empirical/theoretical/review/exploratory) and "
+        "Also infer: method_type (empirical/theoretical/review/exploratory), "
         "objective_scope (exploratory/confirmatory/analytical/comparative). "
-        "For vague prompts, infer these from keywords and context. "
-        "Be concise and accurate."
+        "Be concise."
     )
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.2,
-        max_tokens=400
-    )
-    content = response.choices[0].message.content
-    print(f"[DEBUG] LLM extraction output: {content}")
-    if content is None:
-        return {}
+    full_prompt = f"{system_prompt}\nPrompt: {prompt}"
     try:
-        parsed = json.loads(content)
-        print(f"[DEBUG] Parsed LLM extraction: {parsed}")
-        return parsed
+        response = model.generate_content(full_prompt, generation_config={"max_output_tokens": 200})
+        content = response.text
+        print(f"[DEBUG] Gemini extraction output: {content}")
+        if not content:
+            return {}
+        # Remove markdown code block if present
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content.lstrip("`json").rstrip("`").strip()
+        elif content.startswith("```"):
+            content = content.lstrip("`").rstrip("`").strip()
+        try:
+            parsed = json.loads(content)
+            print(f"[DEBUG] Parsed Gemini extraction: {parsed}")
+            return parsed
+        except Exception as e:
+            print(f"[DEBUG] Gemini JSON error: {e}")
+            # Fallback: try to extract keywords with regex
+            keywords = []
+            m = re.search(r'"key[_ ]?concepts"\s*:\s*\[(.*?)\]', content, re.DOTALL)
+            if m:
+                raw = m.group(1)
+                keywords = [k.strip().strip('"\'') for k in raw.split(',') if k.strip()]
+            print(f"[DEBUG] Fallback keywords: {keywords}")
+            return {"key_concepts": keywords}
     except Exception as e:
-        print(f"[DEBUG] LLM extraction JSON error: {e}")
+        print(f"[DEBUG] Gemini failed: {e}")
         return {} 
