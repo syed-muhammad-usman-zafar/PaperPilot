@@ -8,6 +8,7 @@ load_dotenv()
 genai.configure(api_key=os.getenv("OPENAI_API_KEY"))
 model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
 
+
 def extract_with_llm(prompt):
     system_prompt = (
         "Extract the following as JSON: domain, research methods, objectives, data types, key concepts. "
