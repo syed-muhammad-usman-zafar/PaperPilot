@@ -25,11 +25,22 @@ def build_knowledge_graph(domain, keywords, method, objective, summaries, draft_
             if isinstance(kw, str) and len(kw.strip()) > 2:
                 G.add_node(kw, type='keyword')
                 G.add_edge('Prompt', kw, relation='has_keyword')
-    # Add papers and authors
+    # Add papers and authors, treat user research as unique node
     for i, s in enumerate(summaries):
+        is_user = s.get('source') == 'user_research'
         paper_id = f"Paper_{i+1}"
-        G.add_node(paper_id, type='paper', title=s.get('title', ''), citation=s.get('citation', ''))
-        G.add_edge('Prompt', paper_id, relation='cites')
+        node_type = 'user_research' if is_user else 'paper'
+        node_attrs = {
+            'type': node_type,
+            'title': s.get('title', ''),
+            'citation': s.get('citation', ''),
+            'is_user_research': is_user
+        }
+        G.add_node(paper_id, **node_attrs)
+        if is_user:
+            G.add_edge('Prompt', paper_id, relation='contributed_by_user')
+        else:
+            G.add_edge('Prompt', paper_id, relation='cites')
         G.add_edge(paper_id, 'DraftParagraph', relation='supports')
         # Link keywords to papers
         if keywords and isinstance(keywords, list):
