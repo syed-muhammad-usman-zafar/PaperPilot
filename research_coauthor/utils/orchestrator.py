@@ -2,26 +2,14 @@ from typing import List, Dict, Any
 from .citation_agent import calculate_citation_plan, assign_papers_to_sections
 from .writing_agent import generate_full_paper_with_llm, analyze_knowledge_graph
 from .knowledge_graph import build_knowledge_graph
+from .validation_agent import validate_fullpaper, paper_rectification
 
-def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any], 
+def generate_full_paper(prompt: str, domain:str, keywords:str, method:str, objective:str, validation:List[str],
                        summaries: List[Dict], user_research_context: dict = None) -> Dict[str, Any]:
     """
     Generate a complete academic paper with all sections using neuro-symbolic approach (single LLM call).
     """
-    # Extract research elements
-    domain = llm_extracted.get('domain', 'General Research')
-    keywords = llm_extracted.get('key concepts') or llm_extracted.get('key_concepts', [])
-    method = llm_extracted.get('research methods', ['analysis'])[0] if llm_extracted.get('research methods') else 'analysis'
-    objective = llm_extracted.get('objectives', ['investigate'])[0] if llm_extracted.get('objectives') else 'investigate'
-    # Extract LLM-derived method type and objective scope
-    method_type = llm_extracted.get('method_type', method)
-    objective_scope = llm_extracted.get('objective_scope', objective)
-    # Ensure keywords is a list
-    if isinstance(keywords, str):
-        keywords = [k.strip() for k in keywords.split(',') if k.strip()]
-    elif not isinstance(keywords, list):
-        keywords = list(keywords)
-    # Build context string, include user research if present
+
     context = f"Domain: {domain}\nMethods: {method}\nObjectives: {objective}\nKey Concepts: {', '.join(keywords)}"
     if user_research_context:
         user_summary = user_research_context.get('summary', '')
@@ -35,6 +23,21 @@ def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any],
     # Generate the full paper in a single LLM call
     try:
         llm_result = generate_full_paper_with_llm(context, summaries, kg_summary, user_research_context)
+
+        try:
+            res, errors = validate_fullpaper(llm_result, summaries)
+
+            if not res:
+                llm_result = paper_rectification(llm_result,summaries,errors,validation)
+                print(f"1 Validation error: \n{errors}")
+
+        except ValueError as e:
+            print(f"1 Validation error: {e}")
+
+
+        print("\n\nFinal Paper Generated\n\n")
+        print(llm_result["raw_output"])
+
         # Build References section
         references = []
         for idx, paper in enumerate(summaries):

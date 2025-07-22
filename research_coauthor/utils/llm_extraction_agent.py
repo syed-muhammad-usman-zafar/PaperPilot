@@ -6,20 +6,29 @@ import google.generativeai as genai
 
 load_dotenv()
 genai.configure(api_key=os.getenv("OPENAI_API_KEY"))
-model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+model = genai.GenerativeModel("models/gemini-2.5-flash")
 
 
 def extract_with_llm(prompt):
     system_prompt = (
-        "Extract the following as JSON: domain, research methods, objectives, data types, key concepts. "
-        "Also infer: method_type (empirical/theoretical/review/exploratory), "
-        "objective_scope (exploratory/confirmatory/analytical/comparative). "
-        "Be concise."
+    "Extract the following structured JSON from the given prompt. The output must be a valid JSON object with these exact keys:\n"
+    "- domain (string)\n"
+    "- research methods (list of strings)\n"
+    "- objectives (list of strings)\n"
+    "- data types (list of strings)\n"
+    "- key concepts (list of strings or comma-separated string)\n"
+    "- method_type (string: one of 'empirical', 'theoretical', 'review', 'exploratory')\n"
+    "- objective_scope (string: one of 'exploratory', 'confirmatory', 'analytical', 'comparative')\n"
+    "- validation_requirements (list of strings. About requirements the resultant paper needs to have in accordance with the prompt and the extracted data)\n\n"
+    "Output ONLY valid JSON. Do not include markdown formatting, explanations, or extra text."
+    "Aim for the total Json tokens to be below 1000. and do not exceed this limit in any scenario"
     )
+
     full_prompt = f"{system_prompt}\nPrompt: {prompt}"
     try:
-        response = model.generate_content(full_prompt, generation_config={"max_output_tokens": 200})
+        response = model.generate_content(full_prompt, generation_config={"max_output_tokens": 1500, "temperature": 0.3})
         content = response.text
+        print(f"[DEBUG] Gemini full response: {response}")
         print(f"[DEBUG] Gemini extraction output: {content}")
         if not content:
             return {}
