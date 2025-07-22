@@ -1,5 +1,6 @@
 import streamlit as st
 import base64
+import os
 
 # Add utils to sys.path for imports if running as a script
 # sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils')) # This line is removed as per the new_code
@@ -10,6 +11,8 @@ from utils.knowledge_graph import build_knowledge_graph, show_graph, get_papers_
 from utils.citation_agent import citation_agent
 from utils.orchestrator import generate_full_paper
 from utils.citation_agent import calculate_citation_plan
+from utils.validation_agent import validate_llm_extraction, validate_real_source_summaries, paper_score
+
 
 # PDF extraction helper
 try:
@@ -20,7 +23,9 @@ except ImportError:
 # Main Streamlit UI logic
 
 def get_paperplane_icon_base64():
-    with open("assets/paperplane.ico", "rb") as image_file:
+    current_dir = os.path.dirname(__file__)
+    icon_path = os.path.abspath(os.path.join(current_dir, '..', '..', 'assets', 'paperplane.ico'))
+    with open(icon_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode()
 
 def extract_text_from_file(uploaded_file):
@@ -153,33 +158,31 @@ def main():
                 st.session_state.client_prompt = prompt
                 # LLM extraction
                 llm_extracted = extract_with_llm(prompt)
-                # Fallbacks for missing fields
-                domain = llm_extracted.get('domain', '')
-                keywords = llm_extracted.get('key concepts') or llm_extracted.get('key_concepts', [])
-                def safe_extract_first(lst, default):
-                    if isinstance(lst, list) and lst:
-                        val = lst[0]
-                        if isinstance(val, str) and len(val.strip()) > 2:
-                            return val.strip()
-                    return default
-                method = safe_extract_first(llm_extracted.get('research methods', []), 'analysis')
-                objective = safe_extract_first(llm_extracted.get('objectives', []), 'investigate')
-                data_types = llm_extracted.get('data types', [])
-                if isinstance(keywords, str):
-                    if ',' in keywords:
-                        keywords = [k.strip() for k in keywords.split(',') if k.strip()]
-                    else:
-                        keywords = [k.strip() for k in keywords.split() if k.strip()]
-                elif not isinstance(keywords, list):
-                    keywords = list(keywords)
-                # Calculate citation plan for full paper
-                method_type = llm_extracted.get('method_type', method)
-                objective_scope = llm_extracted.get('objective_scope', objective)
+                
+                try:
+                    vals = validate_llm_extraction(llm_extracted, prompt)
+                except ValueError as e:
+                    print(f"Extraction validation error: {e}")
+                else:
+                    print("\n\n After validation:\n")
+                    domain, keywords, method, objective, data_types, method_type, objective_scope, validation = vals
+                    print(vals)
+
                 citation_plan = calculate_citation_plan(keywords, method_type, objective_scope)
                 total_papers_needed = sum(citation_plan.values())
                 st.session_state.citation_plan = citation_plan
                 max_results = total_papers_needed
-                summaries = get_real_source_summaries(keywords, max_results=max_results)
+                summaries = get_real_source_summaries(keywords, 50)
+
+                try:
+                    vals = validate_real_source_summaries(prompt,max_results,summaries)
+                except ValueError as e:
+                    print(f"Extraction validation error: {e}")
+                else:
+                    summaries = vals
+                    print("\n\nFinal Summaries:\n")
+                    print(len(summaries))
+
                 # --- Prepare user research as context, not as a citable source ---
                 user_research_context = None
                 if 'user_papers' in st.session_state and st.session_state.user_papers:
@@ -197,7 +200,8 @@ def main():
                 else:
                     st.session_state.client_warning = ''
                 # Generate full paper, passing user research context separately
-                full_paper = generate_full_paper(prompt, llm_extracted, summaries, user_research_context=user_research_context)
+                full_paper = generate_full_paper(prompt, domain, keywords, method, objective, validation, summaries, user_research_context=user_research_context)
+
                 st.session_state.full_paper = full_paper
                 st.session_state.backend = {
                     'prompt': prompt,
@@ -219,6 +223,8 @@ def main():
             st.markdown('---')
             st.subheader("📝 Full Academic Paper")
             st.markdown(f"## {st.session_state.full_paper['title']}")
+            accuracy = paper_score(st.session_state.client_prompt,st.session_state.full_paper)
+            st.subheader(f"Accuracy: {accuracy:.2f}")
             for section_name, paragraphs in st.session_state.full_paper['sections'].items():
                 with st.expander(f"📄 {section_name}", expanded=(section_name in ["Abstract", "Introduction"])):
                     for i, paragraph in enumerate(paragraphs):

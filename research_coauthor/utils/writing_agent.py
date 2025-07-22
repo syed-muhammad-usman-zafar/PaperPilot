@@ -5,7 +5,7 @@ import google.generativeai as genai
 
 load_dotenv()
 genai.configure(api_key=os.getenv("OPENAI_API_KEY"))
-model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+model = genai.GenerativeModel("models/gemini-2.5-flash")
 
 
 def analyze_knowledge_graph(G):
@@ -42,7 +42,7 @@ def generate_full_paper_with_llm(context, papers, knowledge_graph_summary, user_
         "Do not invent citations, datasets, or references. Ensure every section is present and clearly separated."
     )
     try:
-        response = model.generate_content(prompt, generation_config={"max_output_tokens": 1024})
+        response = model.generate_content(prompt, generation_config={"max_output_tokens": 16384})
         raw_output = response.text
         # Parse sections by section titles (plain text, not markdown)
         import re
