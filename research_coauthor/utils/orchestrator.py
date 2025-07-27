@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from .citation_agent import calculate_citation_plan, assign_papers_to_sections
 from .writing_agent import generate_full_paper_with_llm, analyze_knowledge_graph
-from .knowledge_graph import build_knowledge_graph
+from .knowledge_graph import build_knowledge_graph, extract_paper_content, get_research_themes_from_graph
 
 def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any], 
                        summaries: List[Dict], user_research_context: dict = None) -> Dict[str, Any]:
@@ -26,15 +26,23 @@ def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any],
     if user_research_context:
         user_summary = user_research_context.get('summary', '')
         context += f"\nUser Research: {user_summary}"
-    # Build knowledge graph and summarize
     print("[DEBUG] Building knowledge graph for neuro-symbolic paper generation...")
     knowledge_graph = build_knowledge_graph(
         domain, keywords, method, objective, summaries, context
     )
     kg_summary = analyze_knowledge_graph(knowledge_graph)
+    
+    # Extract actual paper content from knowledge graph
+    paper_content = extract_paper_content(knowledge_graph)
+    research_themes = get_research_themes_from_graph(knowledge_graph)
+    
+    print(f"[DEBUG] Extracted {len(paper_content)} papers with content from knowledge graph")
+    print(f"[DEBUG] Identified research themes: {research_themes[:5]}")  # Show top 5 themes
+    
     # Generate the full paper in a single LLM call
     try:
         llm_result = generate_full_paper_with_llm(context, summaries, kg_summary, user_research_context)
+        
         # Build References section
         references = []
         for idx, paper in enumerate(summaries):
@@ -48,6 +56,10 @@ def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any],
             ref = f"[{idx+1}] {paper['author_names']}, \"{paper['title']}\"{venue_part}{year_part}"
             references.append(ref)
         references_section = "References\n" + "\n".join(references)
+        
+        print(f"[DEBUG] Built references section with {len(references)} references")
+        print(f"[DEBUG] References section preview: {references_section[:300]}...")
+        
         return {
             "title": f"Research on {', '.join(keywords[:3])}",
             "sections": llm_result.get('sections', {}),
@@ -71,4 +83,4 @@ def generate_full_paper(prompt: str, llm_extracted: Dict[str, Any],
             "papers_found": 0,
             "total_papers_needed": 0,
             "section_assignments": {},
-        } 
+        }
