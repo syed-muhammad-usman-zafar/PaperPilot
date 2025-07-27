@@ -1,11 +1,36 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.pyc
 
 # Environment variables
 .env
 .env.*
 
+# Conda environments
+.conda/
+conda/
+.venv/
+venv/
+env/
+
+# Python virtual environments
+*.egg-info/
+dist/
+build/
+
 # VSCode and other editor settings (optional)
 .vscode/
-.idea/ 
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/ 

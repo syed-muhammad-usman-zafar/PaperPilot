@@ -5,3 +5,5 @@ google-generativeai
 matplotlib
 python-dotenv
 pdfplumber
+Pillow>=9.0.0
+python-docx>=0.8.11
