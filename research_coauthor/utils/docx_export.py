@@ -146,10 +146,10 @@ def generate_filename(research_query):
     
     return f"{clean_name}_research_paper.docx"
 
-def create_download_button(paper_data, research_query, image_data=None, key="download_docx"):
+def create_download_button(paper_data, research_query, key="download_docx"):
     try:
         with st.spinner("📄 Generating editable DOCX file..."):
-            docx_bytes = create_paper_docx(paper_data, research_query, image_data)
+            docx_bytes = create_paper_docx(paper_data, research_query)
         
         if docx_bytes:
             filename = generate_filename(research_query)
@@ -196,7 +196,6 @@ def preview_docx_content(paper_data, research_query):
         st.write("✅ Formatted headings and sections")
         st.write("✅ Justified paragraph alignment") 
         st.write("✅ Proper margins and spacing")
-        st.write("✅ Embedded images (if uploaded)")
         st.write("✅ References section")
         st.write("✅ Fully editable in Microsoft Word")
         total_chars = sum(len(str(content)) for content in sections_data.values())
