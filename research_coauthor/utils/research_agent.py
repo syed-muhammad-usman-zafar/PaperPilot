@@ -201,4 +201,6 @@ def get_real_source_summaries(keywords, max_results=2):
         return get_crossref_summaries(cleaned_keywords, max_results) or get_arxiv_summaries(cleaned_keywords, max_results)
     except Exception as e:
         print(f"[DEBUG] Exception in get_real_source_summaries: {e}")
-        return get_crossref_summaries(cleaned_keywords, max_results) or get_arxiv_summaries(cleaned_keywords, max_results) 
+        return get_crossref_summaries(cleaned_keywords, max_results) or get_arxiv_summaries(cleaned_keywords, max_results)
+
+# Robust summary extraction for research papers
