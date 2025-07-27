@@ -276,7 +276,7 @@ def main():
                         file_name=f"PaperPilot_{st.session_state.full_paper['title'][:30].replace(' ', '_')}.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     )
-                    st.success("✅ DOCX file ready for download! You can add images manually in Word.")
+                    st.success("✅ DOCX file ready for download!")
                 except Exception as e:
                     st.error(f"❌ Error creating DOCX: {e}")
 
