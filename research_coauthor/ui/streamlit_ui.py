@@ -6,6 +6,8 @@ from utils.knowledge_graph import build_knowledge_graph, show_graph
 from utils.citation_agent import calculate_citation_plan
 from utils.orchestrator import generate_full_paper
 from utils.docx_export import create_paper_docx
+from utils.validation_agent import validate_llm_extraction, validate_real_source_summaries, paper_score, rate_paper, val_score
+
 
 try:
     import pdfplumber
@@ -125,34 +127,42 @@ def main():
                 st.session_state.client_prompt = prompt
                 
                 llm_extracted = extract_with_llm(prompt)
-                domain = llm_extracted.get('domain', '')
-                keywords = llm_extracted.get('key concepts') or llm_extracted.get('key_concepts', [])
                 
-                def safe_extract_first(lst, default):
-                    if isinstance(lst, list) and lst:
-                        val = lst[0]
-                        if isinstance(val, str) and len(val.strip()) > 2:
-                            return val.strip()
-                    return default
-                
-                method = safe_extract_first(llm_extracted.get('research methods', []), 'analysis')
-                objective = safe_extract_first(llm_extracted.get('objectives', []), 'investigate')
-                
-                if isinstance(keywords, str):
-                    if ',' in keywords:
-                        keywords = [k.strip() for k in keywords.split(',') if k.strip()]
-                    else:
-                        keywords = [k.strip() for k in keywords.split() if k.strip()]
-                elif not isinstance(keywords, list):
-                    keywords = list(keywords)
-                method_type = llm_extracted.get('method_type', method)
-                objective_scope = llm_extracted.get('objective_scope', objective)
-                citation_plan = calculate_citation_plan(keywords, method_type, objective_scope)
+                try:
+                    vals = validate_llm_extraction(llm_extracted, prompt)
+                except ValueError as e:
+                    print(f"Extraction validation error: {e}")
+                    return
+                else:
+                    print("\n\n After validation:\n")
+                    domain, keywords, method, objective, validation = vals
+                    llm_extracted = {
+                        'domain': domain,
+                        'key_concepts': keywords,
+                        'methods': method,
+                        'objectives': objective,
+                        'validation_requirements': validation
+                    }
+                    print(vals)
+
+                citation_plan = calculate_citation_plan(keywords, method, objective)
                 total_papers_needed = sum(citation_plan.values())
                 st.session_state.citation_plan = citation_plan
                 max_results = total_papers_needed
-                summaries = get_real_source_summaries(keywords, max_results=max_results)
+                summaries = get_real_source_summaries(keywords, 50)
                 
+                st.session_state.validation = validation
+
+                try:
+                    vals = validate_real_source_summaries(prompt,max_results,summaries)
+                except ValueError as e:
+                    print(f"Extraction validation error: {e}")
+                else:
+                    summaries = vals
+                    print("\n\nFinal Summaries:\n")
+                    print(len(summaries))
+
+
                 user_research_context = None
                 if 'user_papers' in st.session_state and st.session_state.user_papers:
                     user_research_context = st.session_state.user_papers[0]
@@ -171,7 +181,7 @@ def main():
             
                 full_paper = generate_full_paper(
                     prompt,
-                    llm_extracted,
+                    domain, keywords, method, objective, validation,
                     summaries,
                     user_research_context=user_research_context
                 )
@@ -198,6 +208,34 @@ def main():
             st.markdown('---')
             st.subheader("📝 Full Academic Paper")
             st.markdown(f"## {st.session_state.full_paper['title']}")
+            # Compute normalized structure score
+            # val_norm = val_score(
+            #     st.session_state.validation,
+            #     st.session_state.full_paper
+            # )
+
+            # Generate full report from rate_paper()
+            val_norm=0.5
+            report = rate_paper(
+                final_paper=st.session_state.full_paper['raw_output'],
+                prompt=st.session_state.client_prompt,
+                context=st.session_state.user_research_text,
+                val_norm=val_norm
+            )
+
+            # Extract the composite Score and prepare tooltip text
+            score_value = report.pop("Score")
+            tooltip_lines = [f"**{metric}**: {val}" for metric, val in report.items()]
+            tooltip_text = "\n\n".join(tooltip_lines)
+
+            # Display the Score header with info tooltip
+            st.subheader("Score")
+            st.metric(
+                label="",
+                value=f"{score_value}/10",
+                help=tooltip_text
+            )
+
             
             # Show the complete paper as one continuous document
             raw_output = st.session_state.full_paper.get('raw_output', 'No content available')

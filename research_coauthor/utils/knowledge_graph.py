@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import streamlit as st
 
 def build_knowledge_graph(domain, keywords, method, objective, summaries, draft_paragraph):
-    print(f"[DEBUG] Building knowledge graph with:\n  domain: {domain}\n  keywords: {keywords}\n  method: {method}\n  objective: {objective}\n  summaries: {summaries}\n  draft_paragraph: {draft_paragraph[:60]}...")
+    #print(f"[DEBUG] Building knowledge graph with:\n  domain: {domain}\n  keywords: {keywords}\n  method: {method}\n  objective: {objective}\n  summaries: {summaries}\n  draft_paragraph: {draft_paragraph[:60]}...")
     G = nx.DiGraph()
 
     G.add_node('Prompt', type='prompt')
@@ -54,8 +54,8 @@ def build_knowledge_graph(domain, keywords, method, objective, summaries, draft_
         if authors and len(authors.strip()) > 2:
             G.add_node(authors, type='author')
             G.add_edge(paper_id, authors, relation='written_by')
-    print(f"[DEBUG] Knowledge graph nodes: {list(G.nodes(data=True))}")
-    print(f"[DEBUG] Knowledge graph edges: {list(G.edges(data=True))}")
+    #print(f"[DEBUG] Knowledge graph nodes: {list(G.nodes(data=True))}")
+    #print(f"[DEBUG] Knowledge graph edges: {list(G.edges(data=True))}")
     return G
 
 def get_papers_for_keyword(G, keyword):

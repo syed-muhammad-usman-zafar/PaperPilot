@@ -181,8 +181,6 @@ def generate_full_paper_with_llm(context, papers, knowledge_graph_summary, user_
         print(f"[DEBUG] Final sections keys: {list(sections.keys())}")
         return {"raw_output": raw_output, "sections": sections}
         
-        return {"raw_output": raw_output, "sections": sections}
-        
     except Exception as e:
         print(f"[DEBUG] Paper generation failed: {e}")
         # Minimal fallback without additional LLM calls

@@ -7,11 +7,11 @@ import google.generativeai as genai
 from enum import Enum
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
 
 class ModelType(Enum):
     """Different model types optimized for different tasks"""
-    FAST = "gemini-2.5-flash"           
+    FAST = "gemini-1.5-flash"           
     BALANCED = "gemini-1.5-flash-latest"
     POWERFUL = "gemini-1.5-pro-latest" 
 
