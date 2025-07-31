@@ -18,22 +18,68 @@ def create_paper_docx(paper_data, research_query):
             section.left_margin = Inches(1)
             section.right_margin = Inches(1)
     
-        title = doc.add_heading(research_query, level=0)
-        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph()
+        # Add document title with better formatting
+        title_text = paper_data.get('title', research_query)
+        if title_text:
+            # Clean and format the title
+            clean_title = title_text.strip().title()  # Convert to Title Case
+            title = doc.add_heading(clean_title, level=0)
+            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Make title bold and larger
+            for run in title.runs:
+                run.font.size = Pt(18)
+                run.font.bold = True
+        else:
+            title = doc.add_heading(research_query.title(), level=0)
+            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in title.runs:
+                run.font.size = Pt(18)
+                run.font.bold = True
+        
+        doc.add_paragraph()  # Add space after title
+        # Improved section mapping with proper formatting
         section_mapping = {
             "Abstract": "Abstract",
             "Introduction": "Introduction", 
             "Literature Review": "Literature Review",
             "Methodology": "Methodology",
-            "Experiments / Results": "Experiments / Results",
+            "Experiments / Results": "Results", # Also try "Experiments / Results"
+            "Results": "Results",
+            "Experiments": "Experiments",
             "Conclusion": "Conclusion"
         }
+        
+        # Get sections data and normalize keys
         sections_data = paper_data.get('sections', {})
         
+        # Create a normalized mapping of section keys (case-insensitive)
+        normalized_sections = {}
+        for key, content in sections_data.items():
+            normalized_key = key.strip().title()  # Convert to Title Case
+            normalized_sections[normalized_key] = content
+        
         for section_title, section_key in section_mapping.items():
+            # Add properly formatted heading with Title Case and styling
             heading = doc.add_heading(section_title, level=1)
-            section_content = sections_data.get(section_key, [])
+            
+            # Style the heading
+            for run in heading.runs:
+                run.font.size = Pt(14)
+                run.font.bold = True
+            
+            # Try multiple variations to find the content
+            section_content = None
+            search_keys = [section_key, section_key.lower(), section_key.upper(), 
+                          section_key.title(), section_title, section_title.lower()]
+            
+            for search_key in search_keys:
+                if search_key in sections_data:
+                    section_content = sections_data[search_key]
+                    break
+                elif search_key in normalized_sections:
+                    section_content = normalized_sections[search_key]
+                    break
             
             if section_content and len(section_content) > 0:
                 for paragraph_text in section_content:
@@ -42,27 +88,66 @@ def create_paper_docx(paper_data, research_query):
                         if not clean_text.startswith('[') or not clean_text.endswith(']'):
                             p = doc.add_paragraph(clean_text)
                             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                            # Improve paragraph formatting
+                            for run in p.runs:
+                                run.font.size = Pt(12)
             else:
                 p = doc.add_paragraph(f"[{section_title} content to be added]")
                 p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                for run in p.runs:
+                    run.font.size = Pt(12)
+                    run.font.italic = True
             # ...existing code...
             
             # Add space between sections
             doc.add_paragraph()
         
+        # Fallback: if sections are empty, try to parse raw output
+        if not any(sections_data.values()) and 'raw_output' in paper_data:
+            raw_content = paper_data['raw_output']
+            if raw_content and len(raw_content.strip()) > 100:
+                print("[DEBUG] Sections empty, parsing raw output...")
+                # Parse raw content by sections
+                import re
+                
+                # Split by common section headers
+                section_pattern = r'\*\*(Abstract|Introduction|Literature Review|Methodology|Results|Experiments|Conclusion)\*\*'
+                sections = re.split(section_pattern, raw_content, flags=re.IGNORECASE)
+                
+                if len(sections) > 1:
+                    for i in range(1, len(sections), 2):  # Skip the first empty part, then take pairs
+                        if i < len(sections) and i+1 < len(sections):
+                            section_name = sections[i].strip().title()
+                            section_text = sections[i+1].strip()
+                            
+                            if section_text and len(section_text) > 20:
+                                heading = doc.add_heading(section_name, level=1)
+                                for run in heading.runs:
+                                    run.font.size = Pt(14)
+                                    run.font.bold = True
+                                
+                                # Split into paragraphs
+                                paragraphs = [p.strip() for p in section_text.split('\n\n') if p.strip()]
+                                for para in paragraphs:
+                                    if para and not para.startswith('['):
+                                        p = doc.add_paragraph(para)
+                                        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                                        for run in p.runs:
+                                            run.font.size = Pt(12)
+                                
+                                doc.add_paragraph()  # Space between sections
+        
         # Add References section - check both structured and raw output
         references_added = False
         
-        print(f"[DEBUG] DOCX Export - Checking for references in paper_data")
-        print(f"[DEBUG] paper_data keys: {list(paper_data.keys())}")
-        print(f"[DEBUG] 'references' in paper_data: {'references' in paper_data}")
-        
-        if 'references' in paper_data:
-            print(f"[DEBUG] References content preview: {paper_data['references'][:200]}...")
-        
         # First, try to use structured references if available
         if 'references' in paper_data and paper_data['references']:
-            doc.add_heading('References', level=1)
+            ref_heading = doc.add_heading('References', level=1)
+            # Style the References heading
+            for run in ref_heading.runs:
+                run.font.size = Pt(14)
+                run.font.bold = True
+                
             refs_content = paper_data['references']
             
             # Clean up references formatting
@@ -81,10 +166,12 @@ def create_paper_docx(paper_data, research_query):
                     len(ref_line) > 20):  # Ensure it's not just a fragment
                     p = doc.add_paragraph(ref_line)
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                    # Style reference text
+                    for run in p.runs:
+                        run.font.size = Pt(11)
                     valid_refs.append(ref_line)
             
             references_added = True
-            print(f"[DEBUG] Added {len(valid_refs)} valid references to DOCX")
             
         # If no structured references, try to extract from raw output
         elif 'raw_output' in paper_data:
@@ -112,10 +199,8 @@ def create_paper_docx(paper_data, research_query):
                             valid_refs.append(ref_line)
                     
                     references_added = True
-                    print(f"[DEBUG] Added {len(valid_refs)} references from raw output to DOCX")
         
         if not references_added:
-            print("[DEBUG] No references were added to DOCX - references data may be missing or filtered out")
             # Add a placeholder if no references found
             doc.add_heading('References', level=1)
             p = doc.add_paragraph("References will be added here.")

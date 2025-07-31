@@ -6,17 +6,45 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 from enum import Enum
 
+# Load environment variables
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+
+def get_api_key():
+   
+    try:
+        import streamlit as st
+       
+        if hasattr(st, 'secrets'):
+            try:
+                if 'GEMINI_API_KEY' in st.secrets:
+                    return st.secrets['GEMINI_API_KEY']
+            except Exception:
+            
+                pass
+    except ImportError:
+        
+        pass
+    
+    return os.getenv("GEMINI_API_KEY")
+
+
+try:
+    api_key = get_api_key()
+    if api_key:
+        genai.configure(api_key=api_key)
+    else:
+        print("Warning: No Gemini API key found. Please set GEMINI_API_KEY in environment variables or Streamlit secrets.")
+except Exception as e:
+    print(f"Warning: Could not configure Gemini API: {e}")
 
 class ModelType(Enum):
-    """Different model types optimized for different tasks"""
+   
     FAST = "gemini-1.5-flash"           
     BALANCED = "gemini-1.5-flash-latest"
     POWERFUL = "gemini-1.5-pro-latest" 
 
 class TaskType(Enum):
-    """Different task types in our architecture"""
+  
     EXTRACTION = "extraction"          
     ANALYSIS = "analysis"             
     GENERATION = "generation"         
@@ -78,13 +106,9 @@ class ModelManager:
         config = self.get_config_for_task(task_type)
         max_output = config.get('max_output_tokens', 512)
         
-        print(f"[DEBUG] Using {TASK_MODEL_MAP[task_type].value} for {task_type.value}")
-        print(f"[DEBUG] Estimated input tokens: {estimated_input_tokens}, max output: {max_output}")
-        
         max_input_tokens = 32000 - max_output - 500 
         if estimated_input_tokens > max_input_tokens:
             optimized_prompt = truncate_content_smartly(optimized_prompt, max_input_tokens)
-            print(f"[DEBUG] Truncated input to fit context window")
         
         model = self.get_model_for_task(task_type)
         
@@ -93,17 +117,10 @@ class ModelManager:
         
         try:
             response = model.generate_content(optimized_prompt, generation_config=generation_config)
-            
-           
-            if hasattr(response, 'usage_metadata'):
-                print(f"[DEBUG] Actual tokens used: {response.usage_metadata}")
-            
             return response
         except Exception as e:
-            print(f"[DEBUG] {TASK_MODEL_MAP[task_type].value} failed for {task_type.value}: {e}")
            
             if task_type == TaskType.GENERATION:
-                print("[DEBUG] Falling back to fast model for generation")
                 fallback_model = self.models[ModelType.FAST]
                 fallback_config = MODEL_CONFIGS[ModelType.FAST]
                 fallback_prompt = truncate_content_smartly(optimized_prompt, 8000)

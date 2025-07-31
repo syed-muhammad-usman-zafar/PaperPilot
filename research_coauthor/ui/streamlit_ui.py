@@ -7,6 +7,7 @@ from utils.citation_agent import calculate_citation_plan
 from utils.orchestrator import generate_full_paper
 from utils.docx_export import create_paper_docx
 from utils.validation_agent import validate_llm_extraction, validate_real_source_summaries, paper_score, rate_paper, val_score
+from utils.chat_agent import PaperChatAgent
 
 
 try:
@@ -208,27 +209,40 @@ def main():
             st.markdown('---')
             st.subheader("📝 Full Academic Paper")
             st.markdown(f"## {st.session_state.full_paper['title']}")
-            # Compute normalized structure score
-            # val_norm = val_score(
-            #     st.session_state.validation,
-            #     st.session_state.full_paper
-            # )
-
-            # Generate full report from rate_paper()
-            val_norm=0.5
+          
+            val_norm = val_score(
+                st.session_state.validation,
+                st.session_state.full_paper
+            )
+            
             report = rate_paper(
                 final_paper=st.session_state.full_paper['raw_output'],
                 prompt=st.session_state.client_prompt,
-                context=st.session_state.user_research_text,
+                context=st.session_state.user_research_text if st.session_state.user_research_text else "",
                 val_norm=val_norm
             )
 
-            # Extract the composite Score and prepare tooltip text
             score_value = report.pop("Score")
-            tooltip_lines = [f"**{metric}**: {val}" for metric, val in report.items()]
-            tooltip_text = "\n\n".join(tooltip_lines)
+            
+            tooltip_text = """**How We Grade Your Papers:**
 
-            # Display the Score header with info tooltip
+**Quality Assessment (10-Point Scale)**
+
+• **Content Relevance** - How well the paper addresses your research prompt and incorporates relevant literature
+• **Writing Clarity** - Professional academic writing style, clear explanations, and logical flow
+• **Structure & Organization** - Proper academic format with introduction, methodology, results, and conclusion
+• **Research Depth** - Comprehensive coverage of the topic with appropriate citations and analysis
+
+**Scoring Guide:**
+• **9-10**: Exceptional quality, publication-ready
+• **7-8**: High quality, minor revisions needed  
+• **5-6**: Good foundation, moderate improvements required
+• **3-4**: Needs significant enhancement
+• **1-2**: Major revision required
+
+Your paper is automatically evaluated using advanced AI to ensure consistent, objective grading across all submissions."""
+
+        
             st.subheader("Score")
             st.metric(
                 label="",
@@ -237,36 +251,32 @@ def main():
             )
 
             
-            # Show the complete paper as one continuous document
             raw_output = st.session_state.full_paper.get('raw_output', 'No content available')
             
             if raw_output and raw_output != 'No content available' and raw_output != '[Error generating paper]':
-                # Display the entire paper content at once
                 st.markdown("### Complete Research Paper")
                 
-                # Clean up the raw output and remove references section if it exists
-                # (we'll add it separately to avoid duplicates)
                 import re
                 cleaned_output = raw_output.replace('**', '**').strip()
-                
-                # Remove any references section from the raw output to avoid duplicates
+
+             
                 cleaned_output = re.sub(r'\*\*REFERENCES?\*\*.*', '', cleaned_output, flags=re.DOTALL | re.IGNORECASE)
                 cleaned_output = re.sub(r'REFERENCES?\s*\n.*', '', cleaned_output, flags=re.DOTALL | re.IGNORECASE)
                 cleaned_output = cleaned_output.strip()
                 
-                # Split into paragraphs for better readability
+              
                 paragraphs = [p.strip() for p in cleaned_output.split('\n\n') if p.strip()]
                 
                 for paragraph in paragraphs:
                     if paragraph.strip():
-                        # Handle section headers differently
+                       
                         if paragraph.startswith('**') and paragraph.endswith('**'):
                             st.markdown(f"### {paragraph.replace('**', '')}")
                         else:
                             st.write(paragraph)
-                        st.markdown("")  # Add space between paragraphs
+                        st.markdown("")
                 
-                # Add references section directly to the main paper content (only once)
+            
                 if 'references' in st.session_state.full_paper:
                     st.markdown("### References")
                     refs_content = st.session_state.full_paper['references']
@@ -285,7 +295,6 @@ def main():
             else:
                 st.error("❌ No paper content was generated. Please try again.")
                 
-                # Show debug info
                 if st.checkbox("🔍 Show Debug Info"):
                     st.json({
                         "raw_output": raw_output,
@@ -293,17 +302,182 @@ def main():
                         "title": st.session_state.full_paper.get('title', 'No title')
                     })
             
+          
+            st.markdown('---')
+            st.subheader("💬 Chat with Your Paper")
+            st.markdown("Ask questions, request modifications, or refine your paper!")
+        
+            if 'chat_agent' not in st.session_state:
+                st.session_state.chat_agent = PaperChatAgent()
+            
+            chat_container = st.container()
+            
+            
+            if st.session_state.chat_history:
+                with chat_container:
+                    st.markdown("**💭 Conversation History:**")
+                    
+                
+                    for i, message in enumerate(st.session_state.chat_history):
+                        if message['role'] == 'user':
+                           
+                            st.info(f"**You:** {message['content']}")
+                        else:
+                           
+                            st.success(f"**PaperPilot:**\n\n{message['content']}")
+                        
+                    
+                        if i < len(st.session_state.chat_history) - 1:
+                            st.markdown("")
+                    
+                    
+                    st.markdown("---")
+            
+           
+            st.markdown("**💭 Continue the conversation:**")
+            
+           
+            col1, col2 = st.columns([5, 1])
+            
+            
+            if 'chat_input_key' not in st.session_state:
+                st.session_state.chat_input_key = 0
+            
+            with col1:
+                user_message = st.text_area(
+                    "Ask a question or request changes:",
+                    placeholder="e.g., 'Explain the methodology in simpler terms' or 'Add more examples to the introduction'",
+                    key=f"main_chat_input_{st.session_state.chat_input_key}",
+                    height=80
+                )
+            
+            with col2:
+                st.markdown("<br>", unsafe_allow_html=True) 
+                send_message = st.button("📤 Send Message", key="main_send_chat", use_container_width=True)
+                clear_chat = st.button("🗑️ Clear Chat History", key="main_clear_chat", use_container_width=True)
+            
+           
+            if clear_chat:
+                st.session_state.chat_history = []
+                st.session_state.chat_agent = PaperChatAgent()
+                st.rerun()
+            
+            if send_message and user_message.strip():
+              
+                st.session_state.chat_history.append({
+                    'role': 'user',
+                    'content': user_message.strip()
+                })
+                
+                
+                with st.spinner("PaperPilot is thinking..."):
+                    try:
+                        paper_content = st.session_state.full_paper.get('raw_output', '')
+                        paper_sections = st.session_state.full_paper.get('sections', {})
+                        
+                        result = st.session_state.chat_agent.process_user_input(
+                            user_message.strip(), paper_content, paper_sections
+                        )
+                        
+                        if result['type'] == 'question':
+                        
+                            bot_response = result['answer']
+                            st.session_state.chat_history.append({
+                                'role': 'bot',
+                                'content': bot_response
+                            })
+                            
+                        elif result['type'] == 'modification':
+                           
+                            mod_result = result['result']
+                            if mod_result['success']:
+                                bot_response = f"✅ **Paper Updated Successfully!**\n\n"
+                                
+                                if mod_result['modified_section'] and mod_result['modified_section'] in paper_sections:
+                                   
+                                    paper_sections[mod_result['modified_section']] = [mod_result['modified_content']]
+                                    st.session_state.full_paper['sections'] = paper_sections
+                                    bot_response += f"**Modified Section:** {mod_result['modified_section']}\n\n"
+                                    bot_response += f"**Changes Made:**\n{mod_result['modified_content'][:400]}...\n\n"
+                                else:
+                                
+                                    st.session_state.full_paper['raw_output'] = mod_result['modified_content']
+                                    st.session_state.full_paper['sections'] = {}  
+                                    bot_response += f"**Full Paper Updated**\n\n"
+                                    bot_response += f"**New Content Preview:**\n{mod_result['modified_content'][:400]}...\n\n"
+                                
+                                bot_response += "🔄 *Your paper has been updated! The changes are reflected in the document above and will be included when you download.*"
+                            else:
+                                bot_response = f"❌ **Modification Failed:** {mod_result.get('error', 'Unknown error occurred')}"
+                            
+                            st.session_state.chat_history.append({
+                                'role': 'bot',
+                                'content': bot_response
+                            })
+                            
+                    except Exception as e:
+                        error_response = f"❌ **Error:** {str(e)}\n\nPlease try rephrasing your request or ask a different question."
+                        st.session_state.chat_history.append({
+                            'role': 'bot',
+                            'content': error_response
+                        })
+            
+                st.session_state.chat_input_key += 1
+                
+                st.rerun()
+        
+            if not st.session_state.chat_history:
+                st.markdown("**✨ Quick Actions:**")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("❓ Explain methodology", key="quick_method"):
+                        st.session_state.chat_history.append({
+                            'role': 'user', 'content': 'Explain the methodology section in simple terms'
+                        })
+                        st.session_state.chat_input_key += 1
+                        st.rerun()
+                
+                with col2:
+                    if st.button("📝 Improve writing", key="quick_improve"):
+                        st.session_state.chat_history.append({
+                            'role': 'user', 'content': 'Improve the writing quality and clarity of the paper'
+                        })
+                        st.session_state.chat_input_key += 1
+                        st.rerun()
+                
+                with col3:
+                    if st.button("📚 Add examples", key="quick_examples"):
+                        st.session_state.chat_history.append({
+                            'role': 'user', 'content': 'Add more practical examples to make the content clearer'
+                        })
+                        st.session_state.chat_input_key += 1
+                        st.rerun()
+            
+        
+            with st.expander("💡 Chat Tips & Examples"):
+                st.markdown("""
+                **Questions you can ask:**
+                - "What are the key findings of this paper?"
+                - "Explain the results in simpler terms"
+                - "Summarize the main contributions"
+                - "How does this methodology work?"
+                
+                **Modifications you can request:**
+                - "Make the abstract more concise"
+                - "Add more detail to the introduction"
+                - "Improve the conclusion with stronger arguments"
+                - "Fix any grammatical errors"
+                - "Make the writing more engaging"
+                
+                **💡 Pro Tip:** Be specific in your requests for better results!
+                """)
+            
+         
             st.markdown('---')
             st.subheader("📥 Download Paper")
             if st.button("📄 Download as DOCX", key="download_docx"):
                 try:
-                    print(f"[DEBUG] DOCX Download - paper_data keys: {list(st.session_state.full_paper.keys())}")
-                    if 'references' in st.session_state.full_paper:
-                        print(f"[DEBUG] DOCX Download - references length: {len(st.session_state.full_paper['references'])}")
-                        print(f"[DEBUG] DOCX Download - references preview: {st.session_state.full_paper['references'][:200]}...")
-                    else:
-                        print("[DEBUG] DOCX Download - No 'references' key found in paper_data")
-                   
                     docx_bytes = create_paper_docx(
                         st.session_state.full_paper,
                         st.session_state.client_prompt
@@ -380,6 +554,8 @@ def main():
                 
             except Exception as e:
                 st.warning(f"Could not build or display knowledge graph: {e}")
+            
+
     
     st.markdown("</div>", unsafe_allow_html=True)
 

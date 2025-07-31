@@ -6,9 +6,6 @@ from .validation_agent import validate_fullpaper, paper_rectification
 
 def generate_full_paper(prompt: str, domain, keywords, method, objective, validation_requirements,
                        summaries: List[Dict], user_research_context: dict = None) -> Dict[str, Any]:
-    """
-    Generate a complete academic paper with all sections using neuro-symbolic approach (single LLM call).
-    """
 
     # Ensure keywords is a list
     if isinstance(keywords, str):
@@ -20,7 +17,6 @@ def generate_full_paper(prompt: str, domain, keywords, method, objective, valida
     if user_research_context:
         user_summary = user_research_context.get('summary', '')
         context += f"\nUser Research: {user_summary}"
-    print("[DEBUG] Building knowledge graph for neuro-symbolic paper generation...")
     knowledge_graph = build_knowledge_graph(
         domain, keywords, method, objective, summaries, context
     )
@@ -30,9 +26,6 @@ def generate_full_paper(prompt: str, domain, keywords, method, objective, valida
     paper_content = extract_paper_content(knowledge_graph)
     research_themes = get_research_themes_from_graph(knowledge_graph)
     
-    print(f"[DEBUG] Extracted {len(paper_content)} papers with content from knowledge graph")
-    print(f"[DEBUG] Identified research themes: {research_themes[:5]}")  # Show top 5 themes
-    
     # Generate the full paper in a single LLM call
     try:
         llm_result = generate_full_paper_with_llm(context, summaries, kg_summary, user_research_context)
@@ -41,8 +34,9 @@ def generate_full_paper(prompt: str, domain, keywords, method, objective, valida
             res, errors = validate_fullpaper(llm_result, summaries)
 
             if not res:
-                llm_result = paper_rectification(llm_result,summaries,errors,validation_requirements)
-                print(f"1 Validation error: \n{errors}")
+                # EMERGENCY FIX: Disable validation LLM call to prevent 43 requests
+                print(f"⚠️  Validation found errors but rectification disabled to prevent API spam: {errors[:3]}")
+                # llm_result = paper_rectification(llm_result,summaries,errors,validation_requirements)
 
         except ValueError as e:
             print(f"1 Validation error: {e}")
@@ -64,9 +58,6 @@ def generate_full_paper(prompt: str, domain, keywords, method, objective, valida
             ref = f"[{idx+1}] {paper['author_names']}, \"{paper['title']}\"{venue_part}{year_part}"
             references.append(ref)
         references_section = "References\n" + "\n".join(references)
-        
-        print(f"[DEBUG] Built references section with {len(references)} references")
-        print(f"[DEBUG] References section preview: {references_section[:300]}...")
         
         return {
             "title": f"Research on {', '.join(keywords[:3])}",

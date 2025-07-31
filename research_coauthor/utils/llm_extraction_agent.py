@@ -19,17 +19,10 @@ Validation requirements is a list of strings about requirements the resultant pa
 Output ONLY valid JSON. Do not include markdown formatting, explanations, or extra text."""
 
     try:
-        # Always use the free-tier model (flash)
-        # from .model_config import model_manager, TaskType
-        # config = model_manager.get_config_for_task(TaskType.EXTRACTION)
-        # config['max_output_tokens'] = 300  # Increase token limit for better extraction
-        # response = generate_with_optimal_model(
-        #     TaskType.EXTRACTION, extraction_prompt, generation_config=config
-        # )
         from .model_config import model_manager, TaskType, ModelType
         model = model_manager.models[ModelType.FAST]
         config = model_manager.get_config_for_task(TaskType.EXTRACTION)
-        config['max_output_tokens'] = 300  # Increase token limit for better extraction
+     
         response = model.generate_content(extraction_prompt, generation_config=config)
         
         if not response or not response.text:

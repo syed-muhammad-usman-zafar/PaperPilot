@@ -130,15 +130,11 @@ def generate_full_paper_with_llm(context, papers, knowledge_graph_summary, user_
     try:
         # Use Gemini 2.0 Flash with increased efficiency
         from .model_config import generate_with_optimal_model, TaskType
-        response = generate_with_optimal_model(TaskType.GENERATION, prompt, max_output_tokens=1536)  # Increased for 2.0 Flash
+        response = generate_with_optimal_model(TaskType.GENERATION, prompt, max_output_tokens=1536)  # Original balanced setting
         raw_output = response.text
-        print("[DEBUG] Raw LLM output preview (first 500 chars):\n", raw_output[:500])
-        print(f"[DEBUG] Total output length: {len(raw_output)} characters")
         
         # Section parsing - handle the exact format the LLM is generating
         import re
-        
-        print(f"[DEBUG] Raw output first 500 chars: {raw_output[:500]}")
         
         sections = {}
         section_titles = ["Abstract", "Introduction", "Literature Review", "Methodology", "Experiments / Results", "Conclusion"]
@@ -146,7 +142,6 @@ def generate_full_paper_with_llm(context, papers, knowledge_graph_summary, user_
         # Split by the **SECTION** pattern that the LLM is actually generating
         section_splits = re.split(r'\*\*([A-Z][^*]+)\*\*', raw_output, flags=re.IGNORECASE)
         
-        print(f"[DEBUG] Section splits found: {len(section_splits)}")
         if len(section_splits) > 1:
             for i in range(1, len(section_splits), 2):
                 if i + 1 < len(section_splits):
@@ -170,19 +165,15 @@ def generate_full_paper_with_llm(context, papers, knowledge_graph_summary, user_
                         if not paragraphs and section_content:
                             paragraphs = [section_content]
                         sections[standard_name] = paragraphs
-                        print(f"[DEBUG] Found {standard_name}: {len(paragraphs)} paragraphs, {len(section_content)} chars")
         
         # Fill in missing sections with placeholders
         for section_title in section_titles:
             if section_title not in sections:
                 sections[section_title] = [f"[{section_title} section not found in output]"]
-                print(f"[DEBUG] Missing section: {section_title}")
         
-        print(f"[DEBUG] Final sections keys: {list(sections.keys())}")
         return {"raw_output": raw_output, "sections": sections}
         
     except Exception as e:
-        print(f"[DEBUG] Paper generation failed: {e}")
         # Minimal fallback without additional LLM calls
         section_titles = ["Abstract", "Introduction", "Literature Review", "Methodology", "Results", "Conclusion"]
         return {
