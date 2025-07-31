@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 import streamlit as st
 import base64
 from utils.llm_extraction_agent import extract_with_llm
