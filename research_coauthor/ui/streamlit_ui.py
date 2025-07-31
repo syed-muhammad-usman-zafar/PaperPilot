@@ -46,7 +46,7 @@ def extract_text_from_file(uploaded_file):
 def main():
     st.set_page_config(
         page_title="PaperPilot",
-        page_icon="../assets/paperplane.ico",
+        page_icon="../assets/paper-plane.png",
         layout="wide"
     )
     icon_base64 = get_paperplane_icon_base64()
