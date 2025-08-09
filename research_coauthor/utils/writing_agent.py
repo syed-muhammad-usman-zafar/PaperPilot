@@ -107,7 +107,7 @@ def generate_full_paper_with_llm(context, papers, knowledge_graph_summary, user_
     # Minimal context to save tokens
     user_context_str = ""
     if user_research_context and user_research_context.get('summary'):
-        user_context_str = f"User: {user_research_context['summary'][:100]}..."
+        user_context_str = f"\nUSER RESEARCH PRIORITY: {user_research_context['summary'][:200]}...\n(Integrate this user research content throughout the paper)\n"
     
     prompt = (
         f"Write academic paper: {context[:120]}\n\n"

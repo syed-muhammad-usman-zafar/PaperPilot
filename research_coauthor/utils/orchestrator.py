@@ -16,7 +16,9 @@ def generate_full_paper(prompt: str, domain, keywords, method, objective, valida
     context = f"Domain: {domain}\nMethods: {method}\nObjectives: {objective}\nKey Concepts: {', '.join(keywords)}"
     if user_research_context:
         user_summary = user_research_context.get('summary', '')
-        context += f"\nUser Research: {user_summary}"
+        user_title = user_research_context.get('title', 'User Research')
+        context += f"\nUser Research Content: {user_title} - {user_summary[:300]}..."
+        print(f"[DEBUG] User research integrated: {user_title}")
     knowledge_graph = build_knowledge_graph(
         domain, keywords, method, objective, summaries, context
     )

@@ -113,10 +113,12 @@ def main():
                     user_paper = {
                         'title': title,
                         'summary': summary,
-                        'citation': '[User Uploaded]',
-                        'ref': '[User Uploaded]',
-                        'author_names': 'User',
-                        'source': 'user_upload'
+                        'citation': '[User Research]',
+                        'ref': '[User Research]',
+                        'author_names': 'User Research',
+                        'year': 'User Provided',
+                        'venue': 'User Upload',
+                        'source': 'user_research'
                     }
                     if 'user_papers' not in st.session_state:
                         st.session_state.user_papers = []
@@ -171,6 +173,9 @@ def main():
                 user_research_context = None
                 if 'user_papers' in st.session_state and st.session_state.user_papers:
                     user_research_context = st.session_state.user_papers[0]
+                    # Add user research to summaries for proper citation
+                    summaries.insert(0, user_research_context)  # Put user research first for priority citation
+                    print(f"[DEBUG] User research added to summaries: {user_research_context.get('title', 'Unknown')}")
                 
                 if not summaries:
                     st.session_state.client_warning = 'No real sources found from Semantic Scholar. Please try different keywords or check your internet connection.'
